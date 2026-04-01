@@ -54,5 +54,16 @@
     "typescript": "~5.9.2",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
+  },
+  "dependencies": {
+    "@babel/types": "^7.29.0",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
+    "expo-document-picker": "^14.0.8",
+    "expo-media-library": "^18.2.1",
+    "lucide-react-native": "^1.7.0",
+    "nativewind": "^4.2.3",
+    "tailwind-merge": "catalog:",
+    "tailwindcss": "^3.4.19"
   }
 }
