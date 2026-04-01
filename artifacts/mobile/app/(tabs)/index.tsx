@@ -1,34 +1,57 @@
 import React, { useEffect, useState } from "react";
-import {
+import { 
+  ScrollView, 
+  View, 
+  Text, 
+  TouchableOpacity, 
   RefreshControl,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-  Platform,
+  Dimensions,
+  TextInput,
+  Image,
+  Platform
 } from "react-native";
-import { ArrowRight, BookOpen, Compass, Play, Plus, Zap } from "lucide-react-native";
+import { 
+  Plus, 
+  ChevronRight,
+  Search,
+  Calendar,
+  Play,
+  ArrowRight,
+  BookOpen,
+  Bell
+} from "lucide-react-native";
+import { Card, CardContent } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { AdBanner } from "@/components/AdBanner";
+import { 
+  getUser,
+  getLearningPaths,
+  type User, 
+  type LearningPath 
+} from "@/utils/storage";
 import { useRouter } from "expo-router";
 
-import { AdBanner } from "@/components/AdBanner";
-import { Card, CardContent } from "@/components/Card";
-import { getLearningPaths, getStats, getUser, type LearningPath, type Stats, type User } from "@/utils/storage";
+const { width } = Dimensions.get("window");
 
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [paths, setPaths] = useState<LearningPath[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const loadData = async () => {
-    const [u, p, s] = await Promise.all([getUser(), getLearningPaths(), getStats()]);
-    setUser(u);
-    setPaths(p);
-    setStats(s);
+    const [userData, allPaths] = await Promise.all([
+      getUser(),
+      getLearningPaths(),
+    ]);
+    setUser(userData);
+    setPaths(allPaths);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -36,128 +59,189 @@ export default function Dashboard() {
     setRefreshing(false);
   };
 
-  const today = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
-  const accuracy = stats?.totalAnswers ? Math.round((stats.correctAnswers / stats.totalAnswers) * 100) : 0;
-
-  const topPadding = Platform.OS === "web" ? 67 : 0;
+  const today = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 
   return (
-    <ScrollView
+    <ScrollView 
       className="flex-1 bg-[#FDFDFD]"
-      contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 120 : 100, paddingTop: topPadding }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      contentContainerStyle={{ paddingBottom: 60 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
     >
-      {/* Header */}
-      <View className="pt-14 pb-6 px-6 bg-black rounded-b-[2.5rem]">
-        <Text className="text-gray-400 font-bold text-xs mb-1">{today}</Text>
-        <Text className="text-white text-3xl font-black">
-          Hi, {user?.name?.split(" ")[0] || "Pelajar"} 👋
-        </Text>
-        <Text className="text-gray-400 font-bold mt-1 text-sm">{user?.goal || "Mari mulai belajar!"}</Text>
+      {/* Header Section */}
+      <View className="pt-16 px-8 flex-row justify-between items-start">
+        <View>
+          <Text className="text-gray-400 font-bold text-sm mb-1">{today}</Text>
+          <Text className="text-black text-4xl font-black">
+            Hi, {user?.name?.split(' ')[0] || "Learner"}
+          </Text>
+        </View>
+        <View className="relative">
+          <View className="w-14 h-14 rounded-2xl bg-gray-200 overflow-hidden">
+            <Image 
+              source={{ uri: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}` }} 
+              className="w-full h-full"
+            />
+          </View>
+          <View className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white" />
+        </View>
       </View>
 
-      {/* Stats Row */}
-      <View className="flex-row gap-3 px-5 mt-5">
-        <Card className="flex-1 bg-indigo-50 border-0">
-          <CardContent className="p-4">
-            <Text className="text-indigo-400 font-black uppercase text-[10px] tracking-widest">Jawaban</Text>
-            <Text className="text-indigo-900 font-black text-2xl mt-1">{stats?.totalAnswers ?? 0}</Text>
-          </CardContent>
-        </Card>
-        <Card className="flex-1 bg-emerald-50 border-0">
-          <CardContent className="p-4">
-            <Text className="text-emerald-400 font-black uppercase text-[10px] tracking-widest">Akurasi</Text>
-            <Text className="text-emerald-900 font-black text-2xl mt-1">{accuracy}%</Text>
-          </CardContent>
-        </Card>
-        <Card className="flex-1 bg-amber-50 border-0">
-          <CardContent className="p-4">
-            <Text className="text-amber-400 font-black uppercase text-[10px] tracking-widest">Streak</Text>
-            <Text className="text-amber-900 font-black text-2xl mt-1">{stats?.streak ?? 0} 🔥</Text>
+      {/* Search Bar */}
+      <View className="px-8 mt-8">
+        <View className="bg-gray-100/80 rounded-2xl flex-row items-center px-4 py-4">
+          <Search color="#94a3b8" size={20} />
+          <TextInput 
+            placeholder="Search"
+            placeholderTextColor="#94a3b8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            className="flex-1 font-bold text-gray-600 ml-3"
+          />
+        </View>
+      </View>
+
+      {/* Hero Banner */}
+      <View className="px-8 mt-8">
+        <Card className="bg-[#EBF5FF] border-0 rounded-[2.5rem] overflow-hidden">
+          <CardContent className="p-0 flex-row">
+            <View className="flex-1 p-8 pr-0 justify-center">
+              <Text className="text-[#1E293B] text-2xl font-black leading-tight mb-6">
+                What would you like to learn today?
+              </Text>
+              <TouchableOpacity 
+                onPress={() => router.push("/learn")}
+                className="bg-white py-3 px-6 rounded-2xl self-start shadow-sm"
+              >
+                <Text className="text-blue-600 font-black">Get started</Text>
+              </TouchableOpacity>
+            </View>
+            <View className="flex-1 items-end justify-end pt-4">
+              <Image 
+                source={{ uri: "https://img.freepik.com/free-vector/learning-concept-illustration_114360-6186.jpg" }}
+                style={{ width: '100%', height: 160 }}
+                resizeMode="contain"
+              />
+            </View>
           </CardContent>
         </Card>
       </View>
 
       {/* AdMob Banner */}
-      <View className="mt-5">
+      <View className="px-8 mt-6">
         <AdBanner />
       </View>
 
-      {/* Quick Actions */}
-      <View className="px-5 mt-5">
-        <Text className="font-black text-black uppercase tracking-widest text-[10px] mb-3">Aksi Cepat</Text>
-        <View className="flex-row gap-3">
-          <TouchableOpacity
-            className="flex-1 bg-black p-5 rounded-[2rem] items-center gap-2"
-            onPress={() => router.push("/learn")}
-          >
-            <Compass color="white" size={24} />
-            <Text className="text-white font-black text-xs text-center">Buka{"\n"}Pelajaran</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="flex-1 bg-indigo-600 p-5 rounded-[2rem] items-center gap-2"
-            onPress={() => router.push("/learn")}
-          >
-            <Zap color="white" size={24} />
-            <Text className="text-white font-black text-xs text-center">Mulai{"\n"}Quiz</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="flex-1 bg-emerald-600 p-5 rounded-[2rem] items-center gap-2"
-            onPress={() => router.push("/learn")}
-          >
-            <BookOpen color="white" size={24} />
-            <Text className="text-white font-black text-xs text-center">Belajar{"\n"}Flashcard</Text>
-          </TouchableOpacity>
+      {/* Bento Grid */}
+      <View className="px-8 mt-6 flex-row gap-4" style={{ height: 240 }}>
+        {/* Left Column - Large Card */}
+        <TouchableOpacity 
+          className="flex-1"
+          onPress={() => router.push("/learn")}
+        >
+          <Card className="flex-1 bg-[#5FB881] border-0 rounded-[2.5rem] p-6 justify-between">
+            <CardContent className="p-0 flex-1 justify-between">
+              <View>
+                <Text className="text-white/70 font-black uppercase text-[10px] tracking-widest mb-2">My Paths</Text>
+                <Text className="text-white text-2xl font-black leading-tight">
+                  {paths.length > 0 ? paths[0].name : "Start Learning"}
+                </Text>
+              </View>
+              
+              <View className="flex-row items-center justify-between">
+                <Text className="text-white font-black text-xs">
+                  {paths.length} path{paths.length !== 1 ? 's' : ''}
+                </Text>
+                <View className="w-10 h-10 bg-white rounded-full items-center justify-center shadow-md">
+                  <Play color="#5FB881" size={18} fill="#5FB881" />
+                </View>
+              </View>
+            </CardContent>
+          </Card>
+        </TouchableOpacity>
+
+        {/* Right Column - Two Small Cards */}
+        <View className="flex-1 gap-4">
+          <Card className="flex-1 bg-[#F8FAFC] border-0 rounded-[2.5rem] p-6 shadow-sm">
+            <Text className="text-[#1E293B] font-black text-base mb-3">Study{"\n"}Schedule –</Text>
+            <View className="flex-row items-center">
+              <View className="w-8 h-8 rounded-full bg-indigo-100 items-center justify-center">
+                <Calendar color="#6366f1" size={14} />
+              </View>
+              <Text className="text-[#64748B] font-black ml-2 text-xs">{today}</Text>
+            </View>
+          </Card>
+          
+          <Card className="flex-1 bg-[#F8FAFC] border-0 rounded-[2.5rem] p-6 shadow-sm">
+            <Text className="text-[#94A3B8] font-black uppercase text-[10px] tracking-widest mb-1">Goal</Text>
+            <Text className="text-[#1E293B] font-black text-sm" numberOfLines={2}>
+              {user?.goal || "Set your learning goal"}
+            </Text>
+          </Card>
         </View>
       </View>
 
-      {/* Learning Paths */}
-      <View className="px-5 mt-6">
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="font-black text-black uppercase tracking-widest text-[10px]">
-            Learning Path
-          </Text>
-          <TouchableOpacity onPress={() => router.push("/learn")}>
-            <Text className="text-indigo-600 font-black text-xs">Lihat Semua</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Quick Navigation Card */}
+      <View className="px-8 mt-6">
+        <TouchableOpacity 
+          className="w-full bg-[#F1F5F9] p-6 rounded-[2.5rem] flex-row items-center justify-between"
+          onPress={() => router.push("/learn")}
+        >
+          <View className="flex-row items-center gap-4">
+            <View className="w-10 h-10 bg-white rounded-2xl items-center justify-center">
+              <BookOpen color="black" size={20} />
+            </View>
+            <Text className="text-black font-black">Open Learning Path</Text>
+          </View>
+          <ArrowRight color="#94A3B8" size={20} />
+        </TouchableOpacity>
+      </View>
 
-        {paths.length === 0 ? (
+      {/* Recent Learning Paths */}
+      {paths.length > 0 && (
+        <View className="px-8 mt-6">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-black font-black text-lg">Your Paths</Text>
+            <TouchableOpacity onPress={() => router.push("/learn")}>
+              <Text className="text-blue-500 font-bold text-sm">See all</Text>
+            </TouchableOpacity>
+          </View>
+          {paths.slice(0, 2).map((p) => (
+            <TouchableOpacity
+              key={p.id}
+              onPress={() => router.push("/learn")}
+              className="bg-white border border-gray-100 p-5 rounded-[2rem] flex-row items-center justify-between mb-3 shadow-sm"
+            >
+              <View className="flex-row items-center gap-3">
+                <View className="w-10 h-10 bg-blue-50 rounded-xl items-center justify-center">
+                  <BookOpen color="#3b82f6" size={18} />
+                </View>
+                <View>
+                  <Text className="text-black font-black">{p.name}</Text>
+                  <Text className="text-gray-400 text-xs font-bold mt-0.5">{p.description || "Tap to continue"}</Text>
+                </View>
+              </View>
+              <ChevronRight color="#94A3B8" size={18} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* Empty State */}
+      {paths.length === 0 && (
+        <View className="px-8 mt-6">
           <TouchableOpacity
             onPress={() => router.push("/learn")}
-            className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2rem] p-8 items-center gap-3"
+            className="border-2 border-dashed border-gray-200 rounded-[2rem] p-8 items-center gap-3"
           >
             <Plus color="#94a3b8" size={32} />
             <Text className="text-gray-400 font-bold text-center">
-              Buat Learning Path pertamamu
+              Create your first Learning Path
             </Text>
           </TouchableOpacity>
-        ) : (
-          <View className="gap-3">
-            {paths.slice(0, 3).map((p) => (
-              <TouchableOpacity
-                key={p.id}
-                onPress={() => router.push("/learn")}
-                className="bg-white border border-gray-100 p-5 rounded-[2rem] flex-row items-center justify-between"
-              >
-                <View className="flex-row items-center gap-3">
-                  <View className="w-10 h-10 bg-indigo-50 rounded-xl items-center justify-center">
-                    <BookOpen color="#6366f1" size={18} />
-                  </View>
-                  <View>
-                    <Text className="text-black font-black">{p.name}</Text>
-                    <Text className="text-gray-400 text-xs font-bold mt-0.5">
-                      {p.description || "Tap untuk belajar"}
-                    </Text>
-                  </View>
-                </View>
-                <ArrowRight color="#94a3b8" size={18} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
-

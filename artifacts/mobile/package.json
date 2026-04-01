@@ -63,6 +63,7 @@
     "expo-media-library": "^18.2.1",
     "lucide-react-native": "^1.7.0",
     "nativewind": "^4.2.3",
+    "react-native-css-interop": "^0.2.3",
     "tailwind-merge": "catalog:",
     "tailwindcss": "^3.4.19"
   }
