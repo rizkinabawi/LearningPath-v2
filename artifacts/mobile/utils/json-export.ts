@@ -11,9 +11,13 @@ export interface QuizItem {
   image?: string;
 }
 
+// Flashcard menggunakan question/answer/tag — SAMA PERSIS dengan format AI output
+// Format flat array (rekomendasi): [{"question":"...","answer":"...","tag":"..."}]
+// Format wrapped: {"type":"flashcard","topic":"...","items":[{"question":"...","answer":"...","tag":"..."}]}
 export interface FlashcardItem {
-  front: string;
-  back: string;
+  question: string;
+  answer: string;
+  tag?: string;
   image?: string;
 }
 

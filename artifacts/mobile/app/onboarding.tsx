@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,17 @@ import {
   StyleSheet,
   Platform,
   Dimensions,
+  ScrollView,
+  Animated,
 } from "react-native";
-import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { saveUser, getUser, generateId, type User } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import { Feather } from "@expo/vector-icons";
 
 const { width } = Dimensions.get("window");
+
 type Level = "beginner" | "intermediate" | "advanced";
 const LEVELS: { val: Level; label: string; emoji: string }[] = [
   { val: "beginner", label: "Pemula", emoji: "🌱" },
@@ -22,15 +25,72 @@ const LEVELS: { val: Level; label: string; emoji: string }[] = [
   { val: "advanced", label: "Lanjut", emoji: "⭐" },
 ];
 
+// ── Tutorial slides (steps 0–3) ─────────────────────────────────────────────
+const TUTORIAL_STEPS = [
+  {
+    key: "welcome",
+    emoji: "👋",
+    bg: "#EBF5FF",
+    accent: Colors.primary,
+    title: "Selamat Datang\ndi LearningPath!",
+    sub: "Aplikasi belajar personal yang fleksibel. Ikuti tur singkat ini untuk memulai.",
+    features: [],
+  },
+  {
+    key: "paths",
+    emoji: "🗂️",
+    bg: "#FFF8EB",
+    accent: "#F59E0B",
+    title: "Kelola Materi\nBelajarmu",
+    sub: "Buat Learning Path → tambah Module → bagi menjadi Lesson. Struktur rapih, belajar makin fokus.",
+    features: [
+      { icon: "folder" as const, text: "Buat Learning Path untuk setiap topik" },
+      { icon: "layers" as const, text: "Bagi ke Module dan Lesson yang spesifik" },
+      { icon: "book-open" as const, text: "Tambah catatan & materi belajar" },
+    ],
+  },
+  {
+    key: "study",
+    emoji: "🃏",
+    bg: "#F0FFF4",
+    accent: "#10B981",
+    title: "Flashcard & Quiz\nInteraktif",
+    sub: "Perkuat hafalan dengan flashcard flip, uji pengetahuan dengan quiz pilihan ganda, dan review kesalahan.",
+    features: [
+      { icon: "credit-card" as const, text: "Flashcard dengan animasi flip" },
+      { icon: "help-circle" as const, text: "Quiz pilihan ganda & skor real-time" },
+      { icon: "target" as const, text: "Review Mistakes untuk belajar dari salah" },
+    ],
+  },
+  {
+    key: "ai",
+    emoji: "🤖",
+    bg: "#F5F3FF",
+    accent: "#7C3AED",
+    title: "AI Prompt\nGenerator",
+    sub: "Generate soal flashcard & quiz otomatis! Salin prompt → tempel ke ChatGPT → import hasilnya langsung ke app.",
+    features: [
+      { icon: "cpu" as const, text: "Generate prompt untuk ChatGPT / Claude" },
+      { icon: "download" as const, text: "Import JSON hasil AI langsung ke lesson" },
+      { icon: "archive" as const, text: "Export & share dalam format JSON / ZIP" },
+    ],
+  },
+];
+
 export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  // Total steps: 4 tutorial + 2 setup (name, goal)
+  const TOTAL_STEPS = 6;
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
   const [topic, setTopic] = useState("");
   const [level, setLevel] = useState<Level>("beginner");
   const [loading, setLoading] = useState(false);
+
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     (async () => {
@@ -39,7 +99,25 @@ export default function Onboarding() {
     })();
   }, []);
 
-  const handleSubmit = async () => {
+  const animateTransition = (nextStep: number) => {
+    Animated.sequence([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+    setStep(nextStep);
+  };
+
+  const handleNext = async () => {
+    if (step < 4) {
+      animateTransition(step + 1);
+      return;
+    }
+    if (step === 4) {
+      if (!name.trim()) return;
+      animateTransition(5);
+      return;
+    }
+    // step === 5 — final submit
     if (!name.trim()) return;
     setLoading(true);
     const user: User = {
@@ -54,176 +132,186 @@ export default function Onboarding() {
     router.replace("/(tabs)");
   };
 
-  const STEPS = [
-    {
-      emoji: "👋",
-      bg: "#EBF5FF",
-      title: "Find Your\nFavourite Lesson",
-      sub: "Rancang perjalanan belajarmu yang fleksibel dan personal bersama kami.",
-      cta: "Mulai",
-      field: null,
-    },
-    {
-      emoji: "📝",
-      bg: "#FFF8EB",
-      title: "Siapa namamu?",
-      sub: "Kami ingin menyapa dengan namamu setiap hari.",
-      cta: "Lanjut",
-      field: "name",
-    },
-    {
-      emoji: "🎯",
-      bg: "#E0FAF8",
-      title: "Apa targetmu?",
-      sub: "Tentukan topik dan level belajarmu sekarang.",
-      cta: "Mulai Belajar!",
-      field: "goal",
-    },
-  ];
-
-  const current = STEPS[step];
-  const isLast = step === STEPS.length - 1;
-
-  const handleNext = async () => {
-    if (step === 0) { setStep(1); return; }
-    if (step === 1) {
-      if (!name.trim()) return;
-      setStep(2);
-      return;
-    }
-    await handleSubmit();
+  const handleSkip = () => {
+    router.replace("/(tabs)");
   };
 
+  const isTutorial = step < 4;
+  const tutorialData = isTutorial ? TUTORIAL_STEPS[step] : null;
+  const ctaLabel =
+    step === 5 ? "Mulai Belajar! 🎉" :
+    step === 4 ? "Lanjut" :
+    step === 3 ? "Ayo Mulai!" : "Lanjut";
+
   return (
-    <KeyboardAwareScrollViewCompat
-      style={styles.container}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: Platform.OS === "web" ? 60 : insets.top + 16, paddingBottom: 40 },
-      ]}
-      bottomOffset={16}
-      keyboardShouldPersistTaps="handled"
-    >
-      {/* Skip */}
-      {step < 2 && (
-        <TouchableOpacity
-          onPress={() => router.replace("/(tabs)")}
-          style={styles.skipBtn}
-        >
-          <Text style={styles.skipText}>Skip</Text>
+    <View style={[styles.root, { paddingTop: Platform.OS === "web" ? 60 : insets.top }]}>
+      {/* Skip button — only on tutorial steps */}
+      {isTutorial && (
+        <TouchableOpacity onPress={handleSkip} style={styles.skipBtn} activeOpacity={0.7}>
+          <Text style={styles.skipText}>Lewati</Text>
         </TouchableOpacity>
       )}
 
-      {/* Illustration circle */}
-      <View style={[styles.illustrationWrap, { backgroundColor: current.bg }]}>
-        <Text style={styles.illustrationEmoji}>{current.emoji}</Text>
-      </View>
-
-      {/* Text */}
-      <Text style={styles.title}>{current.title}</Text>
-      <Text style={styles.sub}>{current.sub}</Text>
-
-      {/* Step-specific inputs */}
-      {step === 1 && (
-        <View style={styles.inputsWrap}>
-          <TextInput
-            placeholder="Nama kamu"
-            value={name}
-            onChangeText={setName}
-            style={styles.input}
-            placeholderTextColor={Colors.textMuted}
-            autoFocus
-          />
-        </View>
-      )}
-
-      {step === 2 && (
-        <View style={styles.inputsWrap}>
-          <TextInput
-            placeholder="Target belajar (misal: lulus JLPT N3)"
-            value={goal}
-            onChangeText={setGoal}
-            style={styles.input}
-            placeholderTextColor={Colors.textMuted}
-          />
-          <TextInput
-            placeholder="Topik utama (misal: React Native)"
-            value={topic}
-            onChangeText={setTopic}
-            style={styles.input}
-            placeholderTextColor={Colors.textMuted}
-          />
-          <Text style={styles.levelLabel}>Level kamu saat ini</Text>
-          <View style={styles.levelRow}>
-            {LEVELS.map((l) => (
-              <TouchableOpacity
-                key={l.val}
-                onPress={() => setLevel(l.val)}
-                style={[
-                  styles.levelChip,
-                  level === l.val && styles.levelChipActive,
-                ]}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.levelEmoji}>{l.emoji}</Text>
-                <Text
-                  style={[
-                    styles.levelText,
-                    level === l.val && styles.levelTextActive,
-                  ]}
-                >
-                  {l.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* CTA */}
-      <TouchableOpacity
-        onPress={handleNext}
-        style={[styles.ctaBtn, loading && styles.ctaBtnDisabled]}
-        activeOpacity={0.85}
-        disabled={loading}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.ctaText}>{current.cta}</Text>
-      </TouchableOpacity>
+        <Animated.View style={{ opacity: fadeAnim, width: "100%", alignItems: "center" }}>
 
-      {/* Dots */}
-      <View style={styles.dots}>
-        {STEPS.map((_, i) => (
-          <View
-            key={i}
-            style={[styles.dot, i === step && styles.dotActive]}
-          />
-        ))}
-      </View>
-    </KeyboardAwareScrollViewCompat>
+          {/* ── TUTORIAL SLIDES (step 0–3) ─────────────────────────── */}
+          {isTutorial && tutorialData && (
+            <>
+              <View style={[styles.illustrationWrap, { backgroundColor: tutorialData.bg }]}>
+                <Text style={styles.illustrationEmoji}>{tutorialData.emoji}</Text>
+              </View>
+
+              <Text style={styles.title}>{tutorialData.title}</Text>
+              <Text style={styles.sub}>{tutorialData.sub}</Text>
+
+              {tutorialData.features.length > 0 && (
+                <View style={styles.featureList}>
+                  {tutorialData.features.map((f, i) => (
+                    <View key={i} style={styles.featureRow}>
+                      <View style={[styles.featureIconWrap, { backgroundColor: tutorialData.bg }]}>
+                        <Feather name={f.icon} size={16} color={tutorialData.accent} />
+                      </View>
+                      <Text style={styles.featureText}>{f.text}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
+          {/* ── SETUP: Name (step 4) ───────────────────────────────── */}
+          {step === 4 && (
+            <>
+              <View style={[styles.illustrationWrap, { backgroundColor: "#FFF8EB" }]}>
+                <Text style={styles.illustrationEmoji}>📝</Text>
+              </View>
+              <Text style={styles.title}>Siapa namamu?</Text>
+              <Text style={styles.sub}>Kami ingin menyapa dengan namamu setiap hari.</Text>
+              <View style={styles.inputsWrap}>
+                <TextInput
+                  placeholder="Nama kamu"
+                  value={name}
+                  onChangeText={setName}
+                  style={styles.input}
+                  placeholderTextColor={Colors.textMuted}
+                  autoFocus
+                  returnKeyType="next"
+                />
+              </View>
+            </>
+          )}
+
+          {/* ── SETUP: Goal & Level (step 5) ──────────────────────── */}
+          {step === 5 && (
+            <>
+              <View style={[styles.illustrationWrap, { backgroundColor: "#E0FAF8" }]}>
+                <Text style={styles.illustrationEmoji}>🎯</Text>
+              </View>
+              <Text style={styles.title}>Apa targetmu?</Text>
+              <Text style={styles.sub}>Tentukan topik dan level belajarmu sekarang.</Text>
+              <View style={styles.inputsWrap}>
+                <TextInput
+                  placeholder="Target belajar (misal: lulus JLPT N3)"
+                  value={goal}
+                  onChangeText={setGoal}
+                  style={styles.input}
+                  placeholderTextColor={Colors.textMuted}
+                />
+                <TextInput
+                  placeholder="Topik utama (misal: React Native)"
+                  value={topic}
+                  onChangeText={setTopic}
+                  style={styles.input}
+                  placeholderTextColor={Colors.textMuted}
+                />
+                <Text style={styles.levelLabel}>Level kamu saat ini</Text>
+                <View style={styles.levelRow}>
+                  {LEVELS.map((l) => (
+                    <TouchableOpacity
+                      key={l.val}
+                      onPress={() => setLevel(l.val)}
+                      style={[styles.levelChip, level === l.val && styles.levelChipActive]}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={styles.levelEmoji}>{l.emoji}</Text>
+                      <Text style={[styles.levelText, level === l.val && styles.levelTextActive]}>
+                        {l.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
+
+        </Animated.View>
+
+        {/* ── CTA Button ─────────────────────────────────────────── */}
+        <TouchableOpacity
+          onPress={handleNext}
+          style={[styles.ctaBtn, loading && styles.ctaBtnDisabled]}
+          activeOpacity={0.85}
+          disabled={loading}
+        >
+          <Text style={styles.ctaText}>{ctaLabel}</Text>
+        </TouchableOpacity>
+
+        {/* ── Dots ───────────────────────────────────────────────── */}
+        <View style={styles.dots}>
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <View key={i} style={[styles.dot, i === step && styles.dotActive]} />
+          ))}
+        </View>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  content: { paddingHorizontal: 28, alignItems: "center" },
-  skipBtn: { alignSelf: "flex-end", marginBottom: 24 },
-  skipText: { fontSize: 14, fontWeight: "700", color: Colors.textMuted },
+  root: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
+  skipBtn: {
+    alignSelf: "flex-end",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  skipText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.textMuted,
+  },
+  scrollContent: {
+    paddingHorizontal: 28,
+    alignItems: "center",
+    paddingTop: 8,
+    flexGrow: 1,
+    justifyContent: "center",
+  },
   illustrationWrap: {
-    width: width * 0.6,
-    height: width * 0.6,
-    borderRadius: (width * 0.6) / 2,
+    width: width * 0.55,
+    height: width * 0.55,
+    borderRadius: (width * 0.55) / 2,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 36,
+    marginBottom: 32,
   },
-  illustrationEmoji: { fontSize: 80 },
+  illustrationEmoji: { fontSize: 72 },
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "900",
     color: Colors.dark,
     textAlign: "center",
-    lineHeight: 38,
-    marginBottom: 14,
+    lineHeight: 36,
+    marginBottom: 12,
   },
   sub: {
     fontSize: 14,
@@ -231,10 +319,42 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
     fontWeight: "500",
-    paddingHorizontal: 8,
-    marginBottom: 32,
+    paddingHorizontal: 4,
+    marginBottom: 24,
   },
-  inputsWrap: { width: "100%", gap: 12, marginBottom: 24 },
+  featureList: {
+    width: "100%",
+    gap: 10,
+    marginBottom: 16,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  featureIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featureText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.dark,
+    lineHeight: 19,
+  },
+  inputsWrap: {
+    width: "100%",
+    gap: 12,
+    marginBottom: 24,
+  },
   input: {
     backgroundColor: Colors.background,
     borderRadius: 16,
@@ -279,19 +399,20 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 28,
+    marginBottom: 24,
+    marginTop: 8,
   },
   ctaBtnDisabled: { opacity: 0.6 },
   ctaText: { fontSize: 16, fontWeight: "900", color: Colors.white },
-  dots: { flexDirection: "row", gap: 8 },
+  dots: { flexDirection: "row", gap: 7 },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: Colors.border,
   },
   dotActive: {
-    width: 24,
+    width: 22,
     backgroundColor: Colors.primary,
   },
 });

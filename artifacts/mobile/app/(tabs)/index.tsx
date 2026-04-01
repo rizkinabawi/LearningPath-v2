@@ -19,6 +19,7 @@ import {
 } from "@/utils/storage";
 import Colors, { shadow, shadowSm, CARD_GRADIENTS } from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
+import { AdBanner } from "@/components/AdBanner";
 
 const { width } = Dimensions.get("window");
 
@@ -371,13 +372,16 @@ export default function Dashboard() {
 
         <View style={{ height: 16 }} />
       </ScrollView>
+
+      {/* AdMob Banner — fixed di bagian bawah layar */}
+      <AdBanner size="banner" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingBottom: 32 },
+  scrollContent: { paddingBottom: 80 },
 
   /* Blobs (shared across gradient cards) */
   blob1: {

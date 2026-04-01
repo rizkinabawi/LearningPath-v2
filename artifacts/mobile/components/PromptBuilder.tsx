@@ -146,8 +146,8 @@ export const PromptBuilder = () => {
             topic: topic.trim(),
             difficulty,
             items: [
-              { question: `Contoh pertanyaan tentang ${topic}?`, answer: "Jawaban lengkap dan informatif di sini.", tag: "contoh-tag" } as any,
-              { question: `Konsep utama ${topic}`, answer: "Penjelasan singkat dan padat tentang konsep ini.", tag: "konsep-inti" } as any,
+              { question: `Contoh pertanyaan tentang ${topic}?`, answer: "Jawaban lengkap dan informatif di sini.", tag: "contoh-tag" },
+              { question: `Konsep utama ${topic}`, answer: "Penjelasan singkat dan padat tentang konsep ini.", tag: "konsep-inti" },
             ],
           }
         : {
@@ -226,41 +226,62 @@ export const PromptBuilder = () => {
         // Flat array format — deteksi tipe dari field yang ada
         const first = raw[0] ?? {};
         const isQuiz = "options" in first;
-        result = {
-          type: isQuiz ? "quiz" : "flashcard",
-          topic: "Import",
-          difficulty: "intermediate",
-          items: raw.map((item: any) => {
-            if (isQuiz) {
-              return {
-                question: item.question ?? "",
-                options: item.options ?? [],
-                answer: item.answer ?? "",
-              };
-            } else {
-              return {
-                front: item.question ?? item.front ?? "",
-                back: item.answer ?? item.back ?? "",
-                tag: item.tag,
-              };
-            }
-          }),
-        };
+        if (isQuiz) {
+          result = {
+            type: "quiz",
+            topic: "Import",
+            difficulty: "intermediate",
+            items: raw.map((item: any) => ({
+              question: item.question ?? "",
+              options: Array.isArray(item.options) ? item.options.map(String) : [],
+              answer: item.answer ?? "",
+            })),
+          };
+        } else {
+          // Selalu pakai question/answer/tag — bukan front/back
+          result = {
+            type: "flashcard",
+            topic: "Import",
+            difficulty: "intermediate",
+            items: raw.map((item: any) => ({
+              question: item.question ?? item.front ?? "",
+              answer: item.answer ?? item.back ?? "",
+              tag: item.tag ?? "",
+            })),
+          };
+        }
       } else if (raw && Array.isArray(raw.items)) {
-        // Wrapped format — sudah benar, tapi normalkan field flashcard
-        result = {
-          ...raw,
-          items: raw.items.map((item: any) => {
-            if (raw.type === "flashcard") {
-              return {
-                front: item.question ?? item.front ?? "",
-                back: item.answer ?? item.back ?? "",
-                tag: item.tag,
-              };
-            }
-            return item;
-          }),
-        } as LearningJsonOutput;
+        // Wrapped format — normalkan ke question/answer/tag
+        const isQuizWrapped = raw.type === "quiz";
+        const normalizedItems = raw.items.map((item: any) => {
+          if (!isQuizWrapped) {
+            return {
+              question: item.question ?? item.front ?? "",
+              answer: item.answer ?? item.back ?? "",
+              tag: item.tag ?? "",
+            };
+          }
+          return {
+            question: item.question ?? "",
+            options: Array.isArray(item.options) ? item.options.map(String) : [],
+            answer: item.answer ?? "",
+          };
+        });
+        if (isQuizWrapped) {
+          result = {
+            type: "quiz",
+            topic: raw.topic ?? "Import",
+            difficulty: raw.difficulty ?? "intermediate",
+            items: normalizedItems,
+          } as LearningJsonOutput;
+        } else {
+          result = {
+            type: "flashcard",
+            topic: raw.topic ?? "Import",
+            difficulty: raw.difficulty ?? "intermediate",
+            items: normalizedItems,
+          } as LearningJsonOutput;
+        }
       } else {
         throw new Error("Format tidak dikenali");
       }
@@ -526,7 +547,7 @@ export const PromptBuilder = () => {
                   <View key={i} style={styles.importedItem}>
                     <Text style={styles.importedItemNum}>{i + 1}</Text>
                     <Text style={styles.importedItemText} numberOfLines={2}>
-                      {"question" in item ? item.question : item.front}
+                      {(item as any).question ?? ""}
                     </Text>
                   </View>
                 ))}

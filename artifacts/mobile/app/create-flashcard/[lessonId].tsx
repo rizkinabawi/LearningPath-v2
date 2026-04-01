@@ -185,8 +185,8 @@ export default function CreateFlashcardScreen() {
 
       let count = 0;
       for (const item of rawItems) {
-        // Dukung field: question/answer/tag (format baru)
-        //           ATAU front/back (format lama PromptBuilder)
+        // Format standar: question/answer/tag
+        // Backward compat: terima front/back jika ada (JSON lama)
         const question = item.question ?? item.front ?? "";
         const answer = item.answer ?? item.back ?? "";
         const tag = item.tag ?? "";
