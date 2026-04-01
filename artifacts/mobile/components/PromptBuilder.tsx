@@ -1,183 +1,817 @@
 import React, { useState } from "react";
 import {
-  Alert,
-  ScrollView,
-  Share,
+  View,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  Clipboard,
+  ScrollView,
+  Alert,
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
 } from "react-native";
-import {
-  BookOpen,
-  Beaker,
-  Check,
-  ChevronRight,
-  Code2,
-  Copy,
-  Divide,
-  FileText,
-  History,
-  Share2,
-  Sparkles,
-} from "lucide-react-native";
-import { Button } from "./Button";
-import { Card, CardContent } from "./Card";
-import { PROMPT_TEMPLATES, generatePrompt, type TemplateTopic } from "@/utils/prompt-templates";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Clipboard from "expo-clipboard";
+import { Feather } from "@expo/vector-icons";
+import { generatePrompt, PROMPT_TEMPLATES, PromptTemplate } from "@/utils/prompt-templates";
+import { shareJson, copyJsonToClipboard, type LearningJsonOutput } from "@/utils/json-export";
+import { exportAsZip } from "@/utils/zip-handler";
+import Colors, { shadow, shadowSm } from "@/constants/colors";
+import { toast } from "@/components/Toast";
 
-const TOPIC_ICONS: Record<TemplateTopic, React.ElementType> = {
-  Programming: Code2,
-  Language: BookOpen,
-  Science: Beaker,
-  Math: Divide,
-  History: History,
-  General: FileText,
-};
+const { width } = Dimensions.get("window");
 
-interface PromptBuilderProps {
-  lessonId?: string;
+const DIFFICULTY_OPTIONS = [
+  { id: "beginner", label: "Mudah", color: Colors.success, bg: Colors.successLight },
+  { id: "intermediate", label: "Sedang", color: Colors.amber, bg: Colors.amberLight },
+  { id: "advanced", label: "Sulit", color: Colors.danger, bg: Colors.dangerLight },
+];
+
+const TYPE_OPTIONS = [
+  { id: "flashcard", label: "Flashcard", icon: "credit-card" as const, color: Colors.primary, bg: Colors.primaryLight },
+  { id: "quiz", label: "Quiz", icon: "help-circle" as const, color: Colors.amber, bg: Colors.amberLight },
+];
+
+function Chip({
+  label,
+  active,
+  color,
+  bg,
+  icon,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  color: string;
+  bg: string;
+  icon?: React.ComponentProps<typeof Feather>["name"];
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.75}
+      style={[
+        styles.chip,
+        active && { backgroundColor: bg, borderColor: color },
+      ]}
+    >
+      {icon && <Feather name={icon} size={13} color={active ? color : Colors.textMuted} />}
+      <Text style={[styles.chipText, active && { color }]}>{label}</Text>
+    </TouchableOpacity>
+  );
 }
 
-export const PromptBuilder = ({ lessonId }: PromptBuilderProps) => {
-  const [topic, setTopic] = useState("");
-  const [selectedTopic, setSelectedTopic] = useState<TemplateTopic | null>(null);
-  const [generatedPrompt, setGeneratedPrompt] = useState("");
-  const [copied, setCopied] = useState(false);
-
-  const handleGenerate = (template: string) => {
-    if (!topic.trim()) {
-      Alert.alert("Topik Kosong", "Masukkan topik terlebih dahulu!");
-      return;
-    }
-    const prompt = generatePrompt(template, topic.trim(), lessonId);
-    setGeneratedPrompt(prompt);
-    setCopied(false);
-  };
-
-  const copyToClipboard = () => {
-    Clipboard.setString(generatedPrompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleShare = async () => {
-    try {
-      await Share.share({ message: generatedPrompt });
-    } catch {}
-  };
-
-  const topics = Object.keys(TOPIC_ICONS) as TemplateTopic[];
-
+function TemplateCard({
+  t,
+  active,
+  onPress,
+}: {
+  t: PromptTemplate;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const isFlashcard = t.type === "flashcard";
+  const color = isFlashcard ? Colors.primary : Colors.amber;
+  const bg = isFlashcard ? Colors.primaryLight : Colors.amberLight;
   return (
-    <View className="space-y-6">
-      {/* Step 1 */}
-      <View>
-        <Text className="text-gray-400 font-black uppercase tracking-widest text-[10px] mb-3">
-          1. Masukkan Topik
-        </Text>
-        <TextInput
-          placeholder="Contoh: React Hooks, Bahasa Jepang, Fisika Kuantum..."
-          value={topic}
-          onChangeText={setTopic}
-          className="bg-gray-50 p-5 rounded-2xl border border-gray-100 font-bold text-lg"
-          placeholderTextColor="#94a3b8"
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.78}
+      style={[styles.templateCard, active && { borderColor: color, backgroundColor: bg }]}
+    >
+      <View style={[styles.templateIconWrap, { backgroundColor: active ? color : Colors.border }]}>
+        <Feather
+          name={isFlashcard ? "credit-card" : "help-circle"}
+          size={16}
+          color={active ? "#fff" : Colors.textMuted}
         />
       </View>
-
-      {/* Step 2 */}
-      <View>
-        <Text className="text-gray-400 font-black uppercase tracking-widest text-[10px] mb-3">
-          2. Pilih Kategori
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View className="flex-row gap-3">
-            {topics.map((t) => {
-              const Icon = TOPIC_ICONS[t];
-              const isSelected = selectedTopic === t;
-              return (
-                <TouchableOpacity
-                  key={t}
-                  onPress={() => setSelectedTopic(t)}
-                  className={`px-5 py-4 rounded-3xl flex-row items-center gap-2 ${
-                    isSelected ? "bg-black" : "bg-gray-50 border border-gray-100"
-                  }`}
-                >
-                  <Icon color={isSelected ? "white" : "black"} size={16} />
-                  <Text className={`font-black ${isSelected ? "text-white" : "text-black"}`}>{t}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
+      <View style={styles.templateInfo}>
+        <Text style={[styles.templateTitle, active && { color }]}>{t.title}</Text>
+        <Text style={styles.templateSub}>{t.description}</Text>
       </View>
+      {active ? (
+        <Feather name="check-circle" size={18} color={color} />
+      ) : (
+        <Feather name="chevron-right" size={16} color={Colors.textMuted} />
+      )}
+    </TouchableOpacity>
+  );
+}
 
-      {/* Step 3 */}
-      {selectedTopic && (
-        <View>
-          <Text className="text-gray-400 font-black uppercase tracking-widest text-[10px] mb-3">
-            3. Pilih Template
-          </Text>
-          <View className="gap-3">
-            {PROMPT_TEMPLATES.filter((t) => t.topic === selectedTopic).map((t) => (
-              <TouchableOpacity
-                key={t.id}
-                onPress={() => handleGenerate(t.template)}
-                className="bg-white border border-gray-100 p-5 rounded-2xl flex-row items-center justify-between"
-              >
-                <View className="flex-1">
-                  <Text className="text-black font-black text-base">{t.title}</Text>
-                  <Text className="text-gray-400 text-xs font-bold uppercase tracking-wider mt-1">
-                    {t.type} · JSON Format
-                  </Text>
-                </View>
-                <View className="w-10 h-10 bg-indigo-50 rounded-full items-center justify-center ml-3">
-                  <ChevronRight color="#6366f1" size={18} />
-                </View>
-              </TouchableOpacity>
-            ))}
+function SectionLabel({ text }: { text: string }) {
+  return <Text style={styles.sectionLabel}>{text}</Text>;
+}
+
+type Tab = "builder" | "share";
+
+export const PromptBuilder = () => {
+  const [activeTab, setActiveTab] = useState<Tab>("builder");
+  const [topic, setTopic] = useState("");
+  const [difficulty, setDifficulty] = useState("intermediate");
+  const [outputType, setOutputType] = useState<"quiz" | "flashcard">("flashcard");
+  const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplate | null>(null);
+  const [generatedPrompt, setGeneratedPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const [sampleJson, setSampleJson] = useState<LearningJsonOutput | null>(null);
+  const [importedJson, setImportedJson] = useState<LearningJsonOutput | null>(null);
+  const [jsonInput, setJsonInput] = useState("");
+
+  const filteredTemplates = PROMPT_TEMPLATES.filter((t) => t.type === outputType);
+  const diffOption = DIFFICULTY_OPTIONS.find((d) => d.id === difficulty)!;
+
+  const handleGenerate = async () => {
+    if (!topic.trim()) {
+      toast.error("Isi topik terlebih dahulu");
+      return;
+    }
+    if (!selectedTemplate) {
+      toast.error("Pilih template terlebih dahulu");
+      return;
+    }
+
+    setLoading(true);
+    await new Promise((r) => setTimeout(r, 400));
+
+    const levelLabel = diffOption.label;
+    const prompt = generatePrompt(selectedTemplate.template, topic.trim(), levelLabel);
+    setGeneratedPrompt(prompt);
+
+    const sampleData: LearningJsonOutput =
+      outputType === "flashcard"
+        ? {
+            type: "flashcard",
+            topic: topic.trim(),
+            difficulty,
+            items: [
+              { question: `Contoh pertanyaan tentang ${topic}?`, answer: "Jawaban lengkap dan informatif di sini.", tag: "contoh-tag" } as any,
+              { question: `Konsep utama ${topic}`, answer: "Penjelasan singkat dan padat tentang konsep ini.", tag: "konsep-inti" } as any,
+            ],
+          }
+        : {
+            type: "quiz",
+            topic: topic.trim(),
+            difficulty,
+            items: [
+              {
+                question: `Soal contoh tentang ${topic}?`,
+                options: ["Jawaban yang benar", "Pilihan salah B", "Pilihan salah C", "Pilihan salah D"],
+                answer: "Jawaban yang benar",
+              },
+            ],
+          };
+
+    setSampleJson(sampleData);
+    await Clipboard.setStringAsync(prompt);
+    setLoading(false);
+    toast.success("Prompt tersalin ke clipboard!");
+  };
+
+  const handleCopyPrompt = async () => {
+    if (!generatedPrompt) return;
+    await Clipboard.setStringAsync(generatedPrompt);
+    toast.success("Prompt tersalin!");
+  };
+
+  const handleSharePrompt = async () => {
+    if (!generatedPrompt) return;
+    try {
+      const { Share } = await import("react-native");
+      await Share.share({ message: generatedPrompt });
+    } catch {
+      toast.error("Gagal membagikan prompt");
+    }
+  };
+
+  const handleCopyJson = async () => {
+    if (!sampleJson) return;
+    await copyJsonToClipboard(sampleJson);
+    toast.success("JSON tersalin ke clipboard!");
+  };
+
+  const handleShareJson = async () => {
+    if (!sampleJson) return;
+    try {
+      await shareJson(sampleJson);
+      toast.success("JSON berhasil dibagikan!");
+    } catch {
+      toast.error("Gagal membagikan JSON");
+    }
+  };
+
+  const handleExportZip = async () => {
+    if (!sampleJson) return;
+    try {
+      await exportAsZip(sampleJson, []);
+      toast.success("ZIP berhasil diekspor!");
+    } catch {
+      toast.error("Gagal mengekspor ZIP");
+    }
+  };
+
+  const handleParseJson = () => {
+    if (!jsonInput.trim()) {
+      toast.error("Tempel JSON terlebih dahulu");
+      return;
+    }
+    try {
+      const raw = JSON.parse(jsonInput.trim());
+
+      // Normalisasi ke format LearningJsonOutput
+      let result: LearningJsonOutput;
+
+      if (Array.isArray(raw)) {
+        // Flat array format — deteksi tipe dari field yang ada
+        const first = raw[0] ?? {};
+        const isQuiz = "options" in first;
+        result = {
+          type: isQuiz ? "quiz" : "flashcard",
+          topic: "Import",
+          difficulty: "intermediate",
+          items: raw.map((item: any) => {
+            if (isQuiz) {
+              return {
+                question: item.question ?? "",
+                options: item.options ?? [],
+                answer: item.answer ?? "",
+              };
+            } else {
+              return {
+                front: item.question ?? item.front ?? "",
+                back: item.answer ?? item.back ?? "",
+                tag: item.tag,
+              };
+            }
+          }),
+        };
+      } else if (raw && Array.isArray(raw.items)) {
+        // Wrapped format — sudah benar, tapi normalkan field flashcard
+        result = {
+          ...raw,
+          items: raw.items.map((item: any) => {
+            if (raw.type === "flashcard") {
+              return {
+                front: item.question ?? item.front ?? "",
+                back: item.answer ?? item.back ?? "",
+                tag: item.tag,
+              };
+            }
+            return item;
+          }),
+        } as LearningJsonOutput;
+      } else {
+        throw new Error("Format tidak dikenali");
+      }
+
+      if (!result.items || result.items.length === 0) {
+        throw new Error("Tidak ada item ditemukan");
+      }
+
+      setImportedJson(result);
+      toast.success(`Berhasil: ${result.items.length} item di-import`);
+    } catch (e: any) {
+      toast.error(e.message === "Format tidak dikenali" ? "Format JSON tidak dikenali" : "JSON tidak valid");
+    }
+  };
+
+  return (
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Header */}
+      <LinearGradient
+        colors={["#4C6FFF", "#7C47FF"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerBlob1} />
+        <View style={styles.headerBlob2} />
+        <View style={styles.headerRow}>
+          <View style={styles.headerIconWrap}>
+            <Feather name="cpu" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>AI Prompt Generator</Text>
+            <Text style={styles.headerSub}>Buat prompt untuk ChatGPT / Claude</Text>
           </View>
         </View>
-      )}
-
-      {/* Result */}
-      {!!generatedPrompt && (
-        <View className="mt-4 bg-indigo-50 p-6 rounded-[2.5rem] border border-indigo-100">
-          <View className="flex-row items-center gap-2 mb-4">
-            <Sparkles color="#6366f1" size={18} />
-            <Text className="text-indigo-900 font-black uppercase tracking-widest text-xs">
-              Prompt Siap Pakai
-            </Text>
-          </View>
-          <Text className="text-indigo-900 font-bold leading-relaxed text-sm mb-6">
-            {generatedPrompt}
-          </Text>
-          {!!lessonId && (
-            <View className="bg-indigo-100 rounded-xl p-3 mb-4">
-              <Text className="text-indigo-700 font-black text-[10px] uppercase tracking-widest mb-1">
-                Lesson ID sudah otomatis diisi:
+        <View style={styles.tabRow}>
+          {(["builder", "share"] as Tab[]).map((t) => (
+            <TouchableOpacity
+              key={t}
+              onPress={() => setActiveTab(t)}
+              style={[styles.headerTab, activeTab === t && styles.headerTabActive]}
+            >
+              <Text style={[styles.headerTabText, activeTab === t && styles.headerTabTextActive]}>
+                {t === "builder" ? "Builder" : "Share & Import"}
               </Text>
-              <Text className="text-indigo-900 font-bold text-xs">{lessonId}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </LinearGradient>
+
+      {activeTab === "builder" ? (
+        <>
+          {/* Topic */}
+          <View style={styles.section}>
+            <SectionLabel text="Topik" />
+            <TextInput
+              placeholder="Contoh: React Native, Fotosintesis, JLPT N3..."
+              value={topic}
+              onChangeText={setTopic}
+              style={styles.input}
+              placeholderTextColor={Colors.textMuted}
+            />
+          </View>
+
+          {/* Output Type */}
+          <View style={styles.section}>
+            <SectionLabel text="Jenis Output" />
+            <View style={styles.chipRow}>
+              {TYPE_OPTIONS.map((o) => (
+                <Chip
+                  key={o.id}
+                  label={o.label}
+                  icon={o.icon}
+                  active={outputType === o.id}
+                  color={o.color}
+                  bg={o.bg}
+                  onPress={() => {
+                    setOutputType(o.id as "quiz" | "flashcard");
+                    setSelectedTemplate(null);
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Difficulty */}
+          <View style={styles.section}>
+            <SectionLabel text="Tingkat Kesulitan" />
+            <View style={styles.chipRow}>
+              {DIFFICULTY_OPTIONS.map((d) => (
+                <Chip
+                  key={d.id}
+                  label={d.label}
+                  active={difficulty === d.id}
+                  color={d.color}
+                  bg={d.bg}
+                  onPress={() => setDifficulty(d.id)}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Templates */}
+          <View style={styles.section}>
+            <SectionLabel text="Template" />
+            <View style={styles.templateList}>
+              {filteredTemplates.map((t) => (
+                <TemplateCard
+                  key={t.id}
+                  t={t}
+                  active={selectedTemplate?.id === t.id}
+                  onPress={() => setSelectedTemplate(t)}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Generate Button */}
+          <TouchableOpacity
+            onPress={handleGenerate}
+            activeOpacity={0.85}
+            style={[styles.generateBtn, shadow]}
+            disabled={loading}
+          >
+            <LinearGradient
+              colors={["#4C6FFF", "#7C47FF"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.generateGrad}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Feather name="zap" size={18} color="#fff" />
+                  <Text style={styles.generateBtnText}>Generate Prompt</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Generated Prompt Output */}
+          {!!generatedPrompt && (
+            <View style={[styles.outputBox, shadowSm]}>
+              <View style={styles.outputHeader}>
+                <View style={styles.outputBadge}>
+                  <Feather name="check-circle" size={13} color={Colors.success} />
+                  <Text style={styles.outputBadgeText}>Prompt Siap</Text>
+                </View>
+                <Text style={styles.outputHint}>Paste ke ChatGPT / Claude</Text>
+              </View>
+              <ScrollView
+                style={styles.promptScroll}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
+                <Text style={styles.promptText}>{generatedPrompt}</Text>
+              </ScrollView>
+              <View style={styles.outputActions}>
+                <TouchableOpacity
+                  onPress={handleCopyPrompt}
+                  style={styles.actionBtnPrimary}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="copy" size={15} color="#fff" />
+                  <Text style={styles.actionBtnPrimaryText}>Salin Prompt</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSharePrompt}
+                  style={styles.actionBtnOutline}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="share-2" size={15} color={Colors.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
-          <View className="flex-row gap-3">
-            <Button className="flex-1 h-12 bg-indigo-600 rounded-2xl" onPress={copyToClipboard}>
-              <View className="flex-row items-center gap-2">
-                {copied ? <Check color="white" size={18} /> : <Copy color="white" size={18} />}
-                <Text className="text-white font-black">
-                  {copied ? "Tersalin!" : "Salin Prompt"}
-                </Text>
+
+          {/* Expected JSON Format Preview */}
+          {!!sampleJson && (
+            <View style={[styles.jsonBox, shadowSm]}>
+              <View style={styles.jsonHeader}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View style={styles.jsonDot} />
+                  <Text style={styles.jsonHeaderTitle}>Format JSON Output</Text>
+                </View>
+                <View style={styles.typeBadge}>
+                  <Text style={styles.typeBadgeText}>{sampleJson.type.toUpperCase()}</Text>
+                </View>
               </View>
-            </Button>
-            <TouchableOpacity
-              onPress={handleShare}
-              className="w-12 h-12 bg-white border border-indigo-200 rounded-2xl items-center justify-center"
-            >
-              <Share2 color="#6366f1" size={20} />
-            </TouchableOpacity>
+              <ScrollView style={styles.jsonScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                <Text style={styles.jsonText}>{JSON.stringify(sampleJson, null, 2)}</Text>
+              </ScrollView>
+              <View style={styles.jsonActions}>
+                <TouchableOpacity onPress={handleCopyJson} style={[styles.jsonActionBtn, { backgroundColor: Colors.dark }]} activeOpacity={0.8}>
+                  <Feather name="copy" size={14} color="#fff" />
+                  <Text style={styles.jsonActionBtnText}>Salin JSON</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleShareJson} style={[styles.jsonActionBtn, { backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.primary }]} activeOpacity={0.8}>
+                  <Feather name="share-2" size={14} color={Colors.primary} />
+                  <Text style={[styles.jsonActionBtnText, { color: Colors.primary }]}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleExportZip} style={[styles.jsonActionBtn, { backgroundColor: Colors.purpleLight, borderWidth: 1, borderColor: Colors.purple }]} activeOpacity={0.8}>
+                  <Feather name="archive" size={14} color={Colors.purple} />
+                  <Text style={[styles.jsonActionBtnText, { color: Colors.purple }]}>ZIP</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Share & Import Tab */}
+          <View style={[styles.infoCard, shadowSm]}>
+            <Feather name="info" size={16} color={Colors.primary} />
+            <Text style={styles.infoText}>
+              Setelah AI menghasilkan JSON, paste di sini untuk melihat pratinjau dan mengimpornya ke aplikasi.
+            </Text>
           </View>
-        </View>
+
+          <View style={styles.section}>
+            <SectionLabel text="Paste JSON dari AI" />
+            <TextInput
+              placeholder={`{\n  "type": "quiz",\n  "topic": "...",\n  "items": [...]\n}`}
+              value={jsonInput}
+              onChangeText={setJsonInput}
+              style={[styles.input, styles.jsonInput]}
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              numberOfLines={8}
+              textAlignVertical="top"
+            />
+          </View>
+
+          <TouchableOpacity onPress={handleParseJson} style={[styles.generateBtn, shadow]} activeOpacity={0.85}>
+            <LinearGradient colors={["#7C3AED", "#A855F7"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.generateGrad}>
+              <Feather name="upload" size={18} color="#fff" />
+              <Text style={styles.generateBtnText}>Parse & Preview JSON</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {importedJson && (
+            <View style={[styles.importedCard, shadow]}>
+              <View style={styles.importedHeader}>
+                <View style={[styles.importedIconWrap, { backgroundColor: Colors.successLight }]}>
+                  <Feather name="check-circle" size={20} color={Colors.success} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.importedTitle}>{importedJson.topic}</Text>
+                  <Text style={styles.importedSub}>
+                    {importedJson.items.length} item · {importedJson.type} · {importedJson.difficulty}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.importedPreview}>
+                {importedJson.items.slice(0, 3).map((item, i) => (
+                  <View key={i} style={styles.importedItem}>
+                    <Text style={styles.importedItemNum}>{i + 1}</Text>
+                    <Text style={styles.importedItemText} numberOfLines={2}>
+                      {"question" in item ? item.question : item.front}
+                    </Text>
+                  </View>
+                ))}
+                {importedJson.items.length > 3 && (
+                  <Text style={styles.importedMore}>+{importedJson.items.length - 3} item lainnya</Text>
+                )}
+              </View>
+
+              <View style={styles.importedActions}>
+                <TouchableOpacity
+                  onPress={() => { copyJsonToClipboard(importedJson); toast.success("JSON tersalin!"); }}
+                  style={[styles.jsonActionBtn, { backgroundColor: Colors.dark, flex: 1 }]}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="copy" size={14} color="#fff" />
+                  <Text style={styles.jsonActionBtnText}>Salin JSON</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { shareJson(importedJson).then(() => toast.success("Dibagikan!")); }}
+                  style={[styles.jsonActionBtn, { backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.primary, flex: 1 }]}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="share-2" size={14} color={Colors.primary} />
+                  <Text style={[styles.jsonActionBtnText, { color: Colors.primary }]}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { exportAsZip(importedJson, []).then(() => toast.success("ZIP diekspor!")); }}
+                  style={[styles.jsonActionBtn, { backgroundColor: Colors.purpleLight, borderWidth: 1, borderColor: Colors.purple, flex: 1 }]}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="archive" size={14} color={Colors.purple} />
+                  <Text style={[styles.jsonActionBtnText, { color: Colors.purple }]}>ZIP</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Expected Format Docs */}
+          <View style={[styles.docsCard, shadowSm]}>
+            <Text style={styles.docsTitle}>Format JSON yang Didukung</Text>
+            <Text style={styles.docsHint}>Sistem menerima flat array (disarankan) atau wrapped object</Text>
+            <View style={styles.docsSep} />
+            <Text style={styles.docsSubtitle}>✅ Flashcard (flat array)</Text>
+            <Text style={styles.docsCode}>{`[\n  {\n    "question": "Apa itu ...",\n    "answer": "Jawaban lengkap",\n    "tag": "kata-kunci"\n  }\n]`}</Text>
+            <View style={styles.docsSep} />
+            <Text style={styles.docsSubtitle}>✅ Quiz (flat array)</Text>
+            <Text style={styles.docsCode}>{`[\n  {\n    "question": "Pertanyaan?",\n    "options": [\n      "Jawaban benar",\n      "Pilihan salah B",\n      "Pilihan salah C",\n      "Pilihan salah D"\n    ],\n    "answer": "Jawaban benar"\n  }\n]`}</Text>
+            <View style={styles.docsSep} />
+            <Text style={styles.docsSubtitle}>⚠️ Penting untuk Quiz</Text>
+            <Text style={styles.docsHint}>Nilai "answer" harus identik (sama persis) dengan salah satu teks di "options". Jangan tulis "A", "B", "C", "D".</Text>
+          </View>
+        </>
       )}
-    </View>
+
+      <View style={{ height: 48 }} />
+    </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: Colors.background },
+  content: { paddingBottom: 32 },
+
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 0,
+    overflow: "hidden",
+    marginBottom: 0,
+  },
+  headerBlob1: { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: "rgba(255,255,255,0.08)", top: -50, right: -40 },
+  headerBlob2: { position: "absolute", width: 90, height: 90, borderRadius: 45, backgroundColor: "rgba(255,255,255,0.06)", bottom: 20, left: 20 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
+  headerIconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 18, fontWeight: "900", color: "#fff", letterSpacing: -0.3 },
+  headerSub: { fontSize: 12, color: "rgba(255,255,255,0.65)", fontWeight: "600", marginTop: 1 },
+  tabRow: { flexDirection: "row", gap: 0 },
+  headerTab: { flex: 1, paddingVertical: 11, alignItems: "center", borderBottomWidth: 2, borderBottomColor: "transparent" },
+  headerTabActive: { borderBottomColor: "#fff" },
+  headerTabText: { fontSize: 13, fontWeight: "700", color: "rgba(255,255,255,0.5)" },
+  headerTabTextActive: { color: "#fff", fontWeight: "900" },
+
+  section: { paddingHorizontal: 16, marginTop: 20 },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+
+  input: {
+    backgroundColor: Colors.white,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.dark,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  jsonInput: {
+    minHeight: 140,
+    fontFamily: "monospace",
+    fontSize: 12,
+    lineHeight: 18,
+    paddingTop: 12,
+  },
+
+  chipRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  chipText: { fontSize: 13, fontWeight: "700", color: Colors.textMuted },
+
+  templateList: { gap: 8 },
+  templateCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  templateIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  templateInfo: { flex: 1 },
+  templateTitle: { fontSize: 14, fontWeight: "800", color: Colors.dark, marginBottom: 2 },
+  templateSub: { fontSize: 12, color: Colors.textMuted, fontWeight: "500" },
+
+  generateBtn: { marginHorizontal: 16, marginTop: 24, borderRadius: 16, overflow: "hidden" },
+  generateGrad: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+  },
+  generateBtnText: { fontSize: 16, fontWeight: "900", color: "#fff", letterSpacing: -0.2 },
+
+  outputBox: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: Colors.white,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 12,
+  },
+  outputHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  outputBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: Colors.successLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  outputBadgeText: { fontSize: 11, fontWeight: "800", color: Colors.success },
+  outputHint: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
+  promptScroll: { maxHeight: 200, backgroundColor: "#F8FAFF", borderRadius: 10, padding: 12 },
+  promptText: { fontSize: 13, color: Colors.dark, lineHeight: 21, fontWeight: "500" },
+  outputActions: { flexDirection: "row", gap: 8 },
+  actionBtnPrimary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.dark,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  actionBtnPrimaryText: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  actionBtnOutline: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+
+  jsonBox: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: Colors.dark,
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+  },
+  jsonHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  jsonDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success },
+  jsonHeaderTitle: { fontSize: 12, fontWeight: "800", color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 1 },
+  typeBadge: { backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  typeBadgeText: { fontSize: 10, fontWeight: "900", color: "rgba(255,255,255,0.7)", letterSpacing: 1 },
+  jsonScroll: { maxHeight: 180 },
+  jsonText: { fontSize: 12, color: "#A5B4FC", lineHeight: 19, fontFamily: "monospace" },
+  jsonActions: { flexDirection: "row", gap: 8 },
+  jsonActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  jsonActionBtnText: { fontSize: 12, fontWeight: "800", color: "#fff" },
+
+  infoCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+    borderWidth: 1,
+    borderColor: Colors.primary + "30",
+  },
+  infoText: { flex: 1, fontSize: 13, color: Colors.primary, fontWeight: "600", lineHeight: 19 },
+
+  importedCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: Colors.white,
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
+  },
+  importedHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  importedIconWrap: { width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  importedTitle: { fontSize: 16, fontWeight: "900", color: Colors.dark },
+  importedSub: { fontSize: 12, color: Colors.textMuted, fontWeight: "600", marginTop: 2, textTransform: "capitalize" },
+  importedPreview: { gap: 8 },
+  importedItem: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  importedItemNum: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: Colors.primaryLight,
+    textAlign: "center",
+    lineHeight: 20,
+    fontSize: 11,
+    fontWeight: "900",
+    color: Colors.primary,
+  },
+  importedItemText: { flex: 1, fontSize: 13, color: Colors.dark, fontWeight: "500", lineHeight: 19 },
+  importedMore: { fontSize: 12, color: Colors.textMuted, fontWeight: "700", textAlign: "center", paddingTop: 4 },
+  importedActions: { flexDirection: "row", gap: 8 },
+
+  docsCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: "#0F1F3D",
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+  },
+  docsTitle: { fontSize: 13, fontWeight: "900", color: "#fff", marginBottom: 2 },
+  docsSubtitle: { fontSize: 11, fontWeight: "800", color: "#A5B4FC", marginBottom: 4 },
+  docsHint: { fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: "500", lineHeight: 16 },
+  docsSep: { height: 1, backgroundColor: "rgba(255,255,255,0.08)" },
+  docsCode: { fontSize: 11, color: "#A5B4FC", lineHeight: 19, fontFamily: "monospace" },
+});

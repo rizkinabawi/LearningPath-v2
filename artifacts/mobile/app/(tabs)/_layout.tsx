@@ -1,25 +1,59 @@
+import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
-import { Home, Compass, BarChart2, Menu } from "lucide-react-native";
 import React from "react";
-import { Platform } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
+
+function TabIcon({
+  name,
+  focused,
+  color,
+}: {
+  name: React.ComponentProps<typeof Feather>["name"];
+  focused: boolean;
+  color: string;
+}) {
+  return (
+    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+      <Feather name={name} size={21} color={color} />
+    </View>
+  );
+}
 
 export default function TabLayout() {
+  const isIOS = Platform.OS === "ios";
+  const isWeb = Platform.OS === "web";
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#000",
-        tabBarInactiveTintColor: "#94a3b8",
-        tabBarStyle: {
-          borderTopWidth: 0,
-          height: Platform.OS === "web" ? 84 : 80,
-          paddingBottom: Platform.OS === "web" ? 34 : 20,
-          paddingTop: 10,
-          backgroundColor: "#fff",
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "800" },
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.tabInactive,
         headerShown: false,
+        tabBarStyle: {
+          backgroundColor: Colors.white,
+          borderTopWidth: 0,
+          elevation: 0,
+          height: isWeb ? 60 : 82,
+          paddingBottom: isWeb ? 8 : 20,
+          paddingTop: 6,
+          shadowColor: "#0F1F3D",
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.07,
+          shadowRadius: 20,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "700",
+          letterSpacing: 0.2,
+        },
+        tabBarBackground: () =>
+          isIOS ? (
+            <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.white }]} />
+          ),
       }}
     >
       <Tabs.Screen
@@ -27,31 +61,78 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, focused }) => (
-            <Home color={color} size={22} fill={focused ? color : "none"} />
+            <TabIcon name="home" focused={focused} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="learn"
         options={{
-          title: "Belajar",
-          tabBarIcon: ({ color }) => <Compass color={color} size={22} />,
+          title: "Kursus",
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="book-open" focused={focused} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="practice"
+        options={{
+          title: "Latihan",
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.centerBtn, focused && styles.centerBtnActive]}>
+              <Feather name="zap" size={22} color={focused ? "#fff" : Colors.textMuted} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           title: "Progress",
-          tabBarIcon: ({ color }) => <BarChart2 color={color} size={22} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="bar-chart-2" focused={focused} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Menu",
-          tabBarIcon: ({ color }) => <Menu color={color} size={22} />,
+          title: "Profil",
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="user" focused={focused} color={color} />
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrap: {
+    width: 38,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconWrapActive: {
+    backgroundColor: Colors.primaryLight,
+  },
+  centerBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  centerBtnActive: {
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+});

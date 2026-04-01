@@ -1,81 +1,67 @@
-const colors = {
-  light: {
-    text: "#1a1a2e",
-    tint: "#4c6ef5",
-
-    background: "#f8f9ff",
-    foreground: "#1a1a2e",
-
-    card: "#ffffff",
-    cardForeground: "#1a1a2e",
-
-    primary: "#4c6ef5",
-    primaryForeground: "#ffffff",
-
-    secondary: "#e8ecff",
-    secondaryForeground: "#1a1a2e",
-
-    muted: "#f0f2ff",
-    mutedForeground: "#6c757d",
-
-    accent: "#7c3aed",
-    accentForeground: "#ffffff",
-
-    success: "#10b981",
-    successForeground: "#ffffff",
-
-    warning: "#f59e0b",
-    warningForeground: "#ffffff",
-
-    destructive: "#ef4444",
-    destructiveForeground: "#ffffff",
-
-    border: "#e2e8f0",
-    input: "#e2e8f0",
-
-    gradient1: "#4c6ef5",
-    gradient2: "#7c3aed",
-  },
-
-  dark: {
-    text: "#f0f4ff",
-    tint: "#7c9ff5",
-
-    background: "#0f1117",
-    foreground: "#f0f4ff",
-
-    card: "#1a1d2e",
-    cardForeground: "#f0f4ff",
-
-    primary: "#7c9ff5",
-    primaryForeground: "#0f1117",
-
-    secondary: "#252840",
-    secondaryForeground: "#f0f4ff",
-
-    muted: "#1e2236",
-    mutedForeground: "#8892a4",
-
-    accent: "#a78bfa",
-    accentForeground: "#0f1117",
-
-    success: "#34d399",
-    successForeground: "#0f1117",
-
-    warning: "#fbbf24",
-    warningForeground: "#0f1117",
-
-    destructive: "#f87171",
-    destructiveForeground: "#0f1117",
-
-    border: "#252840",
-    input: "#252840",
-
-    gradient1: "#7c9ff5",
-    gradient2: "#a78bfa",
-  },
-
-  radius: 12,
+const Colors = {
+  primary: "#4C6FFF",
+  primaryDark: "#3B5AF0",
+  primaryLight: "#EEF0FF",
+  accent: "#FF6B6B",
+  accentLight: "#FFF0F0",
+  teal: "#0AD3C1",
+  tealLight: "#E0FAF8",
+  amber: "#FF9500",
+  amberLight: "#FFF8EB",
+  purple: "#7C3AED",
+  purpleLight: "#F5F3FF",
+  emerald: "#10B981",
+  emeraldLight: "#ECFDF5",
+  dark: "#0F1F3D",
+  black: "#0F1F3D",
+  darkMed: "#1E3A5F",
+  white: "#FFFFFF",
+  background: "#F4F7FF",
+  surface: "#FFFFFF",
+  border: "#E6ECF8",
+  borderLight: "#F0F4FC",
+  text: "#0F1F3D",
+  textSecondary: "#526484",
+  textMuted: "#99AAC3",
+  success: "#22C55E",
+  successLight: "#F0FDF4",
+  danger: "#EF4444",
+  dangerLight: "#FEF2F2",
+  warning: "#F59E0B",
+  warningLight: "#FFFBEB",
+  tabActive: "#4C6FFF",
+  tabInactive: "#99AAC3",
+  card1: "#4C6FFF",
+  card2: "#FF9500",
+  card3: "#0AD3C1",
+  card4: "#7C3AED",
 };
 
-export default colors;
+export default Colors;
+
+export const CARD_COLORS = ["#4C6FFF", "#FF6B6B", "#0AD3C1", "#7C3AED", "#10B981", "#FF9500"];
+
+export const CARD_GRADIENTS: [string, string][] = [
+  ["#4C6FFF", "#7C47FF"],
+  ["#FF6B6B", "#FF9500"],
+  ["#0AD3C1", "#00B4D8"],
+  ["#7C3AED", "#A855F7"],
+  ["#10B981", "#059669"],
+  ["#F59E0B", "#EF4444"],
+];
+
+export const shadow = {
+  shadowColor: "#1E3A5F",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.08,
+  shadowRadius: 16,
+  elevation: 5,
+};
+
+export const shadowSm = {
+  shadowColor: "#1E3A5F",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  elevation: 2,
+};

@@ -1,132 +1,500 @@
-import React, { useEffect, useState } from "react";
-import { Platform, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { AlertCircle, BarChart2, Flame, Target, Trophy, Zap } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Platform,
+  ScrollView,
+  TouchableOpacity,
+  Dimensions,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Feather } from "@expo/vector-icons";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PromptBuilder } from "@/components/PromptBuilder";
+import { getStats, getProgress, type Stats, type Progress } from "@/utils/storage";
+import { classifyAllItems, type DifficultyStats } from "@/utils/difficulty-classifier";
+import { generateReportHTML } from "@/utils/report-generator";
+import { ProgressBar } from "@/components/ProgressBar";
+import Colors from "@/constants/colors";
+import { toast } from "@/components/Toast";
 
-import { Card, CardContent } from "@/components/Card";
-import { AdBanner } from "@/components/AdBanner";
-import { getStats, getWrongAnswers, type Progress as ProgressType, type Stats } from "@/utils/storage";
+const { width } = Dimensions.get("window");
+type Tab = "stats" | "classify" | "prompts";
 
-const topPadding = Platform.OS === "web" ? 67 : 0;
+const DIFF_CONFIG = {
+  mudah:  { label: "Mudah",  color: "#0AD3C1", bg: "#E0FAF8", icon: "trending-up"  as const, emoji: "✅" },
+  sedang: { label: "Sedang", color: "#FF9500", bg: "#FFF8EB", icon: "minus-circle"  as const, emoji: "⚡" },
+  susah:  { label: "Susah",  color: "#FF6B6B", bg: "#FFF0F0", icon: "alert-triangle" as const, emoji: "🔥" },
+};
 
-export default function ProgressPage() {
-  const router = useRouter();
+export default function ProgressTab() {
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const [stats, setStats] = useState<Stats | null>(null);
-  const [wrongAnswers, setWrongAnswers] = useState<ProgressType[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const [progress, setProgress] = useState<Progress[]>([]);
+  const [difficulty, setDifficulty] = useState<DifficultyStats | null>(null);
+  const [tab, setTab] = useState<Tab>("stats");
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [activeDiff, setActiveDiff] = useState<"mudah" | "sedang" | "susah">("susah");
 
-  const loadData = async () => {
-    const [s, mistakes] = await Promise.all([getStats(), getWrongAnswers()]);
-    setStats(s);
-    setWrongAnswers(mistakes);
+  // Switch tab when navigated with ?tab= param
+  useEffect(() => {
+    const t = params.tab;
+    if (t === "stats" || t === "classify" || t === "prompts") {
+      setTab(t);
+    }
+  }, [params.tab]);
+
+  useFocusEffect(useCallback(() => {
+    (async () => {
+      const [s, p, d] = await Promise.all([getStats(), getProgress(), classifyAllItems()]);
+      setStats(s); setProgress(p); setDifficulty(d);
+    })();
+  }, []));
+
+  const accuracy = stats && stats.totalAnswers > 0
+    ? Math.round((stats.correctAnswers / stats.totalAnswers) * 100) : 0;
+  const wrong = (stats?.totalAnswers ?? 0) - (stats?.correctAnswers ?? 0);
+
+  const handleExportPDF = async () => {
+    if (Platform.OS === "web") {
+      toast.info("PDF hanya tersedia di iOS/Android");
+      return;
+    }
+    setPdfLoading(true);
+    try {
+      const Print = await import("expo-print");
+      const Sharing = await import("expo-sharing");
+      const html = await generateReportHTML();
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Laporan Belajar" });
+        toast.success("PDF berhasil dibuat!");
+      } else {
+        toast.info("PDF tersimpan di perangkat");
+      }
+    } catch {
+      toast.error("Gagal membuat PDF");
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
-  useEffect(() => { loadData(); }, []);
+  // Weekly bar chart data (last 7 days)
+  const weeklyBars: { day: string; pct: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const dayP = progress.filter((p) => p.timestamp.slice(0, 10) === key);
+    const dayCorrect = dayP.filter((p) => p.isCorrect).length;
+    const pct = dayP.length > 0 ? Math.round((dayCorrect / dayP.length) * 100) : 0;
+    weeklyBars.push({ day: d.toLocaleDateString("id-ID", { weekday: "short" }), pct });
+  }
+  const maxPct = Math.max(...weeklyBars.map((b) => b.pct), 1);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  };
+  const recent = [...progress]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 20);
 
-  const accuracy = stats?.totalAnswers
-    ? Math.round((stats.correctAnswers / stats.totalAnswers) * 100)
-    : 0;
+  const TABS: { key: Tab; icon: React.ComponentProps<typeof Feather>["name"]; label: string }[] = [
+    { key: "stats",    icon: "bar-chart-2", label: "Statistik" },
+    { key: "classify", icon: "layers",      label: "Klasifikasi" },
+    { key: "prompts",  icon: "zap",         label: "AI Prompt" },
+  ];
 
   return (
-    <View className="flex-1 bg-white" style={{ paddingTop: topPadding }}>
-      <View className="bg-black pt-14 pb-8 px-6 rounded-b-[2.5rem]">
-        <Text className="text-white text-3xl font-black">Performance</Text>
-        <Text className="text-gray-400 font-bold mt-1 text-sm">Analisis perjalanan belajarmu</Text>
-      </View>
-
-      <ScrollView
-        className="flex-1 px-5 pt-6"
-        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 120 : 100 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    <View style={styles.container}>
+      {/* ===== GRADIENT HEADER ===== */}
+      <LinearGradient
+        colors={["#4C6FFF", "#7C47FF"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[styles.headerGrad, { paddingTop: Platform.OS === "web" ? 60 : insets.top + 12 }]}
       >
-        {/* Stats Grid */}
-        <View className="flex-row gap-3 mb-4">
-          <Card className="flex-1 bg-indigo-50 border-0">
-            <CardContent className="p-5">
-              <View className="w-10 h-10 bg-indigo-100 rounded-xl items-center justify-center mb-3">
-                <BarChart2 color="#6366f1" size={18} />
-              </View>
-              <Text className="text-indigo-400 font-black uppercase text-[10px] tracking-widest">Total Jawaban</Text>
-              <Text className="text-indigo-900 font-black text-3xl mt-1">{stats?.totalAnswers ?? 0}</Text>
-            </CardContent>
-          </Card>
-          <Card className="flex-1 bg-emerald-50 border-0">
-            <CardContent className="p-5">
-              <View className="w-10 h-10 bg-emerald-100 rounded-xl items-center justify-center mb-3">
-                <Target color="#10b981" size={18} />
-              </View>
-              <Text className="text-emerald-400 font-black uppercase text-[10px] tracking-widest">Akurasi</Text>
-              <Text className="text-emerald-900 font-black text-3xl mt-1">{accuracy}%</Text>
-            </CardContent>
-          </Card>
+        <View style={styles.hDot1} />
+        <View style={styles.hDot2} />
+
+        {/* Title row */}
+        <View style={styles.titleRow}>
+          <View>
+            <Text style={styles.headerSub}>Perkembanganmu</Text>
+            <Text style={styles.headerTitle}>Progress</Text>
+          </View>
+          <TouchableOpacity onPress={handleExportPDF} style={styles.pdfBtn} activeOpacity={0.8}>
+            <LinearGradient colors={["#4A9EFF", "#6C63FF"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.pdfBtnGrad}>
+              {pdfLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <><Feather name="download" size={14} color="#fff" /><Text style={styles.pdfBtnText}>PDF</Text></>
+              }
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
-        <View className="flex-row gap-3 mb-6">
-          <Card className="flex-1 bg-amber-50 border-0">
-            <CardContent className="p-5">
-              <View className="w-10 h-10 bg-amber-100 rounded-xl items-center justify-center mb-3">
-                <Flame color="#f59e0b" size={18} />
+        {/* Hero: Ring + Stat chips */}
+        <View style={styles.heroRow}>
+          {/* Accuracy ring */}
+          <View style={styles.ringContainer}>
+            <View style={styles.ringOuter}>
+              <View style={styles.ringInner}>
+                <Text style={styles.ringVal}>{accuracy}%</Text>
+                <Text style={styles.ringLbl}>AKURASI</Text>
               </View>
-              <Text className="text-amber-400 font-black uppercase text-[10px] tracking-widest">Streak</Text>
-              <Text className="text-amber-900 font-black text-3xl mt-1">{stats?.streak ?? 0} 🔥</Text>
-            </CardContent>
-          </Card>
-          <Card className="flex-1 bg-rose-50 border-0">
-            <CardContent className="p-5">
-              <View className="w-10 h-10 bg-rose-100 rounded-xl items-center justify-center mb-3">
-                <Zap color="#f43f5e" size={18} />
+            </View>
+            {/* Arc decoration */}
+            <View style={[styles.ringArc, { borderColor: accuracy >= 70 ? "#0AD3C1" : accuracy >= 40 ? "#FF9500" : "#FF6B6B" }]} />
+          </View>
+
+          {/* 4 stat chips */}
+          <View style={styles.chipsGrid}>
+            {[
+              { icon: "message-circle" as const, val: stats?.totalAnswers ?? 0, lbl: "Jawaban", grad: ["#4A9EFF","#6C63FF"] as [string,string] },
+              { icon: "check-circle"   as const, val: stats?.correctAnswers ?? 0, lbl: "Benar",   grad: ["#0AD3C1","#00B4D8"] as [string,string] },
+              { icon: "x-circle"       as const, val: wrong,                     lbl: "Salah",   grad: ["#FF6B6B","#EF4444"] as [string,string] },
+              { icon: "activity"       as const, val: stats?.streak ?? 0,        lbl: "Streak",  grad: ["#FF9500","#FF6B6B"] as [string,string] },
+            ].map((c, i) => (
+              <View key={i} style={styles.chip}>
+                <LinearGradient colors={c.grad} style={styles.chipIcon}>
+                  <Feather name={c.icon} size={13} color="#fff" />
+                </LinearGradient>
+                <Text style={styles.chipVal}>{c.val}</Text>
+                <Text style={styles.chipLbl}>{c.lbl}</Text>
               </View>
-              <Text className="text-rose-400 font-black uppercase text-[10px] tracking-widest">Salah</Text>
-              <Text className="text-rose-900 font-black text-3xl mt-1">{wrongAnswers.length}</Text>
-            </CardContent>
-          </Card>
+            ))}
+          </View>
         </View>
 
-        {/* AdMob Banner */}
-        <AdBanner className="mb-6" />
-
-        {/* Mistakes Review */}
-        {wrongAnswers.length > 0 && (
-          <View className="mb-6">
-            <Text className="font-black text-black uppercase tracking-widest text-[10px] mb-3">
-              Review Kesalahan
-            </Text>
+        {/* Tab strip */}
+        <View style={styles.tabStrip}>
+          {TABS.map((t) => (
             <TouchableOpacity
-              onPress={() => router.push("/mistakes-review")}
-              className="bg-rose-50 border border-rose-100 p-5 rounded-[2rem] flex-row items-center justify-between"
+              key={t.key}
+              onPress={() => setTab(t.key)}
+              style={[styles.tabItem, tab === t.key && styles.tabItemActive]}
+              activeOpacity={0.75}
             >
-              <View className="flex-row items-center gap-3">
-                <View className="w-12 h-12 bg-rose-100 rounded-2xl items-center justify-center">
-                  <AlertCircle color="#f43f5e" size={22} />
-                </View>
-                <View>
-                  <Text className="text-rose-900 font-black">{wrongAnswers.length} Jawaban Salah</Text>
-                  <Text className="text-rose-400 text-xs font-bold mt-0.5">Tap untuk review ulang</Text>
+              <Feather name={t.icon} size={13} color={tab === t.key ? "#fff" : "rgba(255,255,255,0.4)"} />
+              <Text style={[styles.tabItemText, tab === t.key && styles.tabItemTextActive]}>
+                {t.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </LinearGradient>
+
+      {/* ===== CONTENT ===== */}
+      {tab === "stats" && (
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+          {/* Weekly bar chart */}
+          <View style={styles.card}>
+            <View style={styles.cardHead}>
+              <View style={styles.cardHeadLeft}>
+                <LinearGradient colors={["#4A9EFF","#6C63FF"]} style={styles.cardHeadIcon}>
+                  <Feather name="bar-chart-2" size={13} color="#fff" />
+                </LinearGradient>
+                <Text style={styles.cardTitle}>Akurasi 7 Hari</Text>
+              </View>
+              <Text style={styles.cardHint}>(%) per hari</Text>
+            </View>
+            <View style={styles.barChartWrap}>
+              {weeklyBars.map((b, i) => {
+                const h = Math.max(4, (b.pct / maxPct) * 80);
+                const col = b.pct >= 70 ? "#0AD3C1" : b.pct >= 40 ? "#FF9500" : b.pct === 0 ? "#E2E8F0" : "#FF6B6B";
+                return (
+                  <View key={i} style={styles.barCol}>
+                    <Text style={[styles.barValText, { color: col }]}>{b.pct > 0 ? `${b.pct}` : ""}</Text>
+                    <View style={styles.barTrack}>
+                      <View style={[styles.barFill, { height: h, backgroundColor: col }]} />
+                    </View>
+                    <Text style={styles.barDayText}>{b.day}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Accuracy progress */}
+          <View style={styles.card}>
+            <View style={styles.cardHead}>
+              <View style={styles.cardHeadLeft}>
+                <LinearGradient colors={["#0AD3C1","#00B4D8"]} style={styles.cardHeadIcon}>
+                  <Feather name="target" size={13} color="#fff" />
+                </LinearGradient>
+                <Text style={styles.cardTitle}>Akurasi Keseluruhan</Text>
+              </View>
+              <Text style={[styles.cardHint, { fontSize: 18, fontWeight: "900", color: Colors.dark }]}>{accuracy}%</Text>
+            </View>
+            <View style={{ marginTop: 4 }}>
+              <ProgressBar
+                value={accuracy}
+                color={accuracy >= 70 ? "#0AD3C1" : accuracy >= 40 ? "#FF9500" : "#FF6B6B"}
+                height={10}
+                backgroundColor={Colors.border}
+              />
+            </View>
+            <Text style={styles.progressSub}>{stats?.correctAnswers ?? 0} benar · {wrong} salah · {stats?.totalAnswers ?? 0} total</Text>
+          </View>
+
+          {/* Activity heatmap */}
+          {recent.length > 0 && (
+            <View style={styles.card}>
+              <View style={styles.cardHead}>
+                <View style={styles.cardHeadLeft}>
+                  <LinearGradient colors={["#7C3AED","#A855F7"]} style={styles.cardHeadIcon}>
+                    <Feather name="grid" size={13} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.cardTitle}>Aktivitas Terbaru</Text>
                 </View>
               </View>
-              <Trophy color="#f43f5e" size={20} />
-            </TouchableOpacity>
-          </View>
-        )}
+              <View style={styles.heatmapWrap}>
+                {recent.slice(0, 21).map((p, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.heatCell,
+                      { backgroundColor: p.isCorrect ? "#0AD3C1" : "#FF6B6B" },
+                    ]}
+                  />
+                ))}
+              </View>
+              <View style={styles.heatLegend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: "#0AD3C1" }]} />
+                  <Text style={styles.legendText}>Benar</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: "#FF6B6B" }]} />
+                  <Text style={styles.legendText}>Salah</Text>
+                </View>
+                <Text style={styles.legendText}>{recent.length} aktivitas</Text>
+              </View>
+            </View>
+          )}
 
-        {stats?.totalAnswers === 0 && (
-          <View className="items-center py-12">
-            <Trophy color="#e2e8f0" size={60} />
-            <Text className="text-gray-300 font-black text-lg mt-4 text-center">
-              Belum ada data performa
+          {/* Log */}
+          {recent.length > 0 && (
+            <View style={styles.card}>
+              <View style={styles.cardHead}>
+                <View style={styles.cardHeadLeft}>
+                  <LinearGradient colors={["#FF9500","#FF6B6B"]} style={styles.cardHeadIcon}>
+                    <Feather name="list" size={13} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.cardTitle}>Log Jawaban</Text>
+                </View>
+              </View>
+              {recent.slice(0, 10).map((p, i) => (
+                <View key={i} style={[styles.logRow, i < Math.min(10, recent.length) - 1 && styles.logRowBorder]}>
+                  <View style={[styles.logDot, { backgroundColor: p.isCorrect ? "#0AD3C1" : "#FF6B6B" }]} />
+                  <Feather name={p.flashcardId ? "credit-card" : "help-circle"} size={13} color={Colors.textMuted} />
+                  <Text style={styles.logDate}>{new Date(p.timestamp).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</Text>
+                  <Text style={[styles.logResult, { color: p.isCorrect ? "#059669" : "#DC2626" }]}>
+                    {p.isCorrect ? "✓ Benar" : "✗ Salah"}
+                  </Text>
+                  {p.userAnswer ? <Text style={styles.logAnswer} numberOfLines={1}>{p.userAnswer}</Text> : null}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {recent.length === 0 && (
+            <LinearGradient colors={["#0A1628","#1A3066"]} style={styles.emptyGrad}>
+              <View style={styles.hDot1} /><View style={styles.hDot2} />
+              <Feather name="trending-up" size={40} color="rgba(74,158,255,0.6)" />
+              <Text style={styles.emptyTitle}>Belum Ada Data</Text>
+              <Text style={styles.emptySub}>Kerjakan flashcard atau kuis untuk melihat statistikmu di sini</Text>
+            </LinearGradient>
+          )}
+
+          {/* PDF Button */}
+          <TouchableOpacity onPress={handleExportPDF} activeOpacity={0.85} style={{ borderRadius: 16, overflow: "hidden" }}>
+            <LinearGradient colors={["#0A1628","#1A3066"]} start={{x:0,y:0}} end={{x:1,y:0}} style={styles.pdfBigBtn}>
+              <View style={styles.pdfBigIconWrap}>
+                {pdfLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Feather name="file-text" size={20} color="#fff" />
+                }
+              </View>
+              <View>
+                <Text style={styles.pdfBigTitle}>Export Laporan PDF</Text>
+                <Text style={styles.pdfBigSub}>Graph, heatmap, klasifikasi soal & log lengkap</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.4)" style={{ marginLeft: "auto" }} />
+            </LinearGradient>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {tab === "classify" && (
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Summary pills */}
+          <View style={styles.card}>
+            <View style={styles.cardHead}>
+              <View style={styles.cardHeadLeft}>
+                <LinearGradient colors={["#7C3AED","#A855F7"]} style={styles.cardHeadIcon}>
+                  <Feather name="layers" size={13} color="#fff" />
+                </LinearGradient>
+                <Text style={styles.cardTitle}>Klasifikasi Otomatis</Text>
+              </View>
+            </View>
+            <Text style={styles.classifyDesc}>
+              Soal diklasifikasikan berdasarkan akurasi percobaan kamu. Mudah (≥70%), Sedang (40–69%), Susah (&lt;40%).
             </Text>
-            <Text className="text-gray-300 font-bold text-sm mt-2 text-center">
-              Mulai kerjakan flashcard atau quiz untuk melihat statistikmu!
-            </Text>
+            <View style={styles.diffSummaryRow}>
+              {(["mudah","sedang","susah"] as const).map((d) => {
+                const cfg = DIFF_CONFIG[d];
+                const count = difficulty?.[d].length ?? 0;
+                return (
+                  <TouchableOpacity
+                    key={d}
+                    onPress={() => setActiveDiff(d)}
+                    style={[styles.diffSummaryChip, { backgroundColor: cfg.bg, borderColor: activeDiff === d ? cfg.color : "transparent", borderWidth: 2 }]}
+                    activeOpacity={0.75}
+                  >
+                    <Feather name={cfg.icon} size={16} color={cfg.color} />
+                    <Text style={[styles.diffSummaryVal, { color: cfg.color }]}>{count}</Text>
+                    <Text style={[styles.diffSummaryLbl, { color: cfg.color }]}>{cfg.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        )}
-      </ScrollView>
+
+          {/* Active category list */}
+          {(() => {
+            const cfg = DIFF_CONFIG[activeDiff];
+            const items = difficulty?.[activeDiff] ?? [];
+            return (
+              <View style={styles.card}>
+                <View style={styles.cardHead}>
+                  <View style={styles.cardHeadLeft}>
+                    <LinearGradient
+                      colors={activeDiff === "mudah" ? ["#0AD3C1","#00B4D8"] : activeDiff === "sedang" ? ["#FF9500","#FF6B6B"] : ["#FF6B6B","#EF4444"]}
+                      style={styles.cardHeadIcon}
+                    >
+                      <Feather name={cfg.icon} size={13} color="#fff" />
+                    </LinearGradient>
+                    <Text style={styles.cardTitle}>Soal {cfg.label}</Text>
+                  </View>
+                  <Text style={[styles.cardHint, { color: cfg.color, fontWeight: "800" }]}>{items.length} soal</Text>
+                </View>
+
+                {items.length === 0 ? (
+                  <View style={styles.diffEmpty}>
+                    <Feather name={cfg.icon} size={32} color={cfg.color} />
+                    <Text style={[styles.diffEmptyText, { color: cfg.color }]}>Belum ada soal {cfg.label.toLowerCase()}</Text>
+                    <Text style={styles.diffEmptySub}>Kerjakan lebih banyak latihan untuk melihat klasifikasi</Text>
+                  </View>
+                ) : (
+                  items.map((item, i) => (
+                    <View key={item.id} style={[styles.classifyRow, i < items.length - 1 && styles.classifyRowBorder]}>
+                      <View style={[styles.classifyTypeBadge, { backgroundColor: cfg.bg }]}>
+                        <Feather name={item.type === "flashcard" ? "credit-card" : "help-circle"} size={12} color={cfg.color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.classifyQ} numberOfLines={2}>{item.question}</Text>
+                        <View style={styles.classifyMeta}>
+                          <Text style={styles.classifyMetaText}>{item.attempts}× attempt</Text>
+                          <Text style={styles.classifyMetaText}>·</Text>
+                          <Text style={[styles.classifyAcc, { color: cfg.color }]}>{item.accuracy}% benar</Text>
+                        </View>
+                      </View>
+                      <View style={[styles.accuracyPill, { backgroundColor: cfg.bg }]}>
+                        <Text style={[styles.accuracyPillText, { color: cfg.color }]}>{item.accuracy}%</Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+            );
+          })()}
+        </ScrollView>
+      )}
+
+      {tab === "prompts" && <PromptBuilder />}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  headerGrad: { paddingHorizontal: 20, paddingBottom: 0, overflow: "hidden" },
+  hDot1: { position: "absolute", width: 180, height: 180, borderRadius: 90, backgroundColor: "rgba(74,158,255,0.1)", top: -50, right: -50 },
+  hDot2: { position: "absolute", width: 110, height: 110, borderRadius: 55, backgroundColor: "rgba(10,211,193,0.07)", bottom: -20, left: 20 },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  headerSub: { fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: "700", textTransform: "uppercase", letterSpacing: 1 },
+  headerTitle: { fontSize: 24, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
+  pdfBtn: { borderRadius: 12, overflow: "hidden" },
+  pdfBtnGrad: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9 },
+  pdfBtnText: { fontSize: 12, fontWeight: "800", color: "#fff" },
+  heroRow: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 16 },
+  ringContainer: { width: 100, height: 100, alignItems: "center", justifyContent: "center" },
+  ringOuter: { width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
+  ringInner: { width: 74, height: 74, borderRadius: 37, backgroundColor: "rgba(10,22,40,0.6)", alignItems: "center", justifyContent: "center" },
+  ringArc: { position: "absolute", width: 96, height: 96, borderRadius: 48, borderWidth: 4, borderTopColor: "transparent", borderRightColor: "transparent" },
+  ringVal: { fontSize: 20, fontWeight: "900", color: "#fff" },
+  ringLbl: { fontSize: 8, color: "rgba(255,255,255,0.5)", fontWeight: "700", textTransform: "uppercase", letterSpacing: 1 },
+  chipsGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { width: "46%", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 14, padding: 10, flexDirection: "row", alignItems: "center", gap: 8 },
+  chipIcon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  chipVal: { fontSize: 16, fontWeight: "900", color: "#fff" },
+  chipLbl: { fontSize: 9, color: "rgba(255,255,255,0.45)", fontWeight: "700", textTransform: "uppercase" },
+  tabStrip: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" },
+  tabItem: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 12 },
+  tabItemActive: { borderBottomWidth: 2.5, borderBottomColor: Colors.primary },
+  tabItemText: { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.4)" },
+  tabItemTextActive: { color: "#fff" },
+  scrollContent: { padding: 20, paddingBottom: 40, gap: 12 },
+  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.border, gap: 12 },
+  cardHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  cardHeadLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cardHeadIcon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  cardTitle: { fontSize: 13, fontWeight: "800", color: Colors.dark },
+  cardHint: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
+  barChartWrap: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", height: 110, paddingTop: 16 },
+  barCol: { flex: 1, alignItems: "center", gap: 4 },
+  barValText: { fontSize: 9, fontWeight: "800", height: 12 },
+  barTrack: { width: "70%", height: 80, justifyContent: "flex-end" },
+  barFill: { width: "100%", borderRadius: 4 },
+  barDayText: { fontSize: 9, color: Colors.textMuted, fontWeight: "700" },
+  progressSub: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
+  heatmapWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  heatCell: { width: (width - 28 - 14 * 2 - 6 * 6) / 7, height: (width - 28 - 14 * 2 - 6 * 6) / 7, borderRadius: 5 },
+  heatLegend: { flexDirection: "row", alignItems: "center", gap: 14 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendDot: { width: 10, height: 10, borderRadius: 3 },
+  legendText: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
+  logRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9 },
+  logRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+  logDot: { width: 7, height: 7, borderRadius: 4 },
+  logDate: { fontSize: 11, color: Colors.textMuted, fontWeight: "700", width: 50 },
+  logResult: { fontSize: 12, fontWeight: "800", width: 60 },
+  logAnswer: { flex: 1, fontSize: 11, color: Colors.textSecondary, fontWeight: "500" },
+  emptyGrad: { borderRadius: 20, padding: 32, alignItems: "center", gap: 10, overflow: "hidden" },
+  emptyTitle: { fontSize: 18, fontWeight: "900", color: "#fff" },
+  emptySub: { fontSize: 13, color: "rgba(255,255,255,0.6)", fontWeight: "500", textAlign: "center", lineHeight: 20 },
+  pdfBigBtn: { flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 16, padding: 18, overflow: "hidden" },
+  pdfBigIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
+  pdfBigTitle: { fontSize: 15, fontWeight: "900", color: "#fff" },
+  pdfBigSub: { fontSize: 11, color: "rgba(255,255,255,0.55)", fontWeight: "500", marginTop: 2 },
+  classifyDesc: { fontSize: 12, color: Colors.textSecondary, fontWeight: "500", lineHeight: 18 },
+  diffSummaryRow: { flexDirection: "row", gap: 10 },
+  diffSummaryChip: { flex: 1, alignItems: "center", borderRadius: 14, paddingVertical: 12, gap: 4 },
+  diffSummaryVal: { fontSize: 22, fontWeight: "900" },
+  diffSummaryLbl: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
+  diffEmpty: { alignItems: "center", paddingVertical: 24, gap: 8 },
+  diffEmptyText: { fontSize: 15, fontWeight: "800" },
+  diffEmptySub: { fontSize: 12, color: Colors.textMuted, fontWeight: "500", textAlign: "center" },
+  classifyRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11 },
+  classifyRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+  classifyTypeBadge: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  classifyQ: { fontSize: 13, fontWeight: "700", color: Colors.dark, lineHeight: 19 },
+  classifyMeta: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
+  classifyMetaText: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
+  classifyAcc: { fontSize: 11, fontWeight: "800" },
+  accuracyPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  accuracyPillText: { fontSize: 12, fontWeight: "900" },
+});

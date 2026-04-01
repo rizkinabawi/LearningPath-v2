@@ -1,8 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system";
+import { Platform } from "react-native";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
+// Types
 export interface User {
   id: string;
   name: string;
@@ -81,32 +80,29 @@ export interface Stats {
   lastStudyDate: string;
 }
 
-// ─── JSON Batch Import/Export Types (used by upload-batch screen & prompt builder) ─
-
-export interface FlashcardBatchJSON {
+// Catatan per pelajaran
+export interface Note {
+  id: string;
   lessonId: string;
-  flashcards: FlashcardBatchItem[];
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface FlashcardBatchItem {
-  question: string;
-  answer: string;
-  tag: string;
-}
-
-export interface QuizBatchJSON {
+// Materi belajar per pelajaran (text / html / file)
+export interface StudyMaterial {
+  id: string;
   lessonId: string;
-  quizzes: QuizBatchItem[];
+  title: string;
+  type: "text" | "html" | "file";
+  content: string;       // text or HTML string
+  filePath?: string;     // local file path for type=file
+  fileName?: string;     // original file name
+  fileSize?: number;     // bytes
+  fileMime?: string;     // MIME type
+  createdAt: string;
 }
-
-export interface QuizBatchItem {
-  question: string;
-  options: string[];
-  answer: string;
-  type: "multiple-choice" | "true-false";
-}
-
-// ─── Storage Keys ─────────────────────────────────────────────────────────────
 
 const STORAGE_KEYS = {
   USER: "user",
@@ -117,35 +113,12 @@ const STORAGE_KEYS = {
   QUIZZES: "quizzes",
   PROGRESS: "progress",
   STATS: "stats",
+  NOTES: "notes",
+  STUDY_MATERIALS: "study_materials",
 };
 
-// ─── Image Helpers ────────────────────────────────────────────────────────────
-
-const IMAGE_DIR = `${FileSystem.documentDirectory}images/`;
-
-const ensureImageDir = async () => {
-  const info = await FileSystem.getInfoAsync(IMAGE_DIR);
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(IMAGE_DIR, { intermediates: true });
-  }
-};
-
-export const saveImage = async (uriOrBase64: string): Promise<string> => {
-  await ensureImageDir();
-  const filename = `${Date.now()}.jpg`;
-  const dest = `${IMAGE_DIR}${filename}`;
-  if (uriOrBase64.startsWith("data:")) {
-    const base64Data = uriOrBase64.split(",")[1];
-    await FileSystem.writeAsStringAsync(dest, base64Data, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-  } else {
-    await FileSystem.copyAsync({ from: uriOrBase64, to: dest });
-  }
-  return dest;
-};
-
-// ─── Generic Helpers ──────────────────────────────────────────────────────────
+export const generateId = () =>
+  `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const getFromStorage = async <T>(key: string): Promise<T[]> => {
   try {
@@ -159,13 +132,10 @@ const getFromStorage = async <T>(key: string): Promise<T[]> => {
 const saveToStorage = async <T>(key: string, data: T[]) => {
   try {
     await AsyncStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error(`Error saving ${key}`, e);
-  }
+  } catch {}
 };
 
-// ─── User ─────────────────────────────────────────────────────────────────────
-
+// User
 export const getUser = async (): Promise<User | null> => {
   const data = await AsyncStorage.getItem(STORAGE_KEYS.USER);
   return data ? JSON.parse(data) : null;
@@ -175,15 +145,9 @@ export const saveUser = async (user: User) => {
   await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
 };
 
-export const deleteUser = async () => {
-  await AsyncStorage.removeItem(STORAGE_KEYS.USER);
-};
-
-// ─── Learning Paths ───────────────────────────────────────────────────────────
-
-export const getLearningPaths = async (userId?: string): Promise<LearningPath[]> => {
-  const paths = await getFromStorage<LearningPath>(STORAGE_KEYS.LEARNING_PATHS);
-  return userId ? paths.filter((p) => p.userId === userId) : paths;
+// Learning Paths
+export const getLearningPaths = async (): Promise<LearningPath[]> => {
+  return getFromStorage<LearningPath>(STORAGE_KEYS.LEARNING_PATHS);
 };
 
 export const saveLearningPath = async (path: LearningPath) => {
@@ -196,11 +160,13 @@ export const saveLearningPath = async (path: LearningPath) => {
 
 export const deleteLearningPath = async (id: string) => {
   const paths = await getLearningPaths();
-  await saveToStorage(STORAGE_KEYS.LEARNING_PATHS, paths.filter((p) => p.id !== id));
+  await saveToStorage(
+    STORAGE_KEYS.LEARNING_PATHS,
+    paths.filter((p) => p.id !== id)
+  );
 };
 
-// ─── Modules ──────────────────────────────────────────────────────────────────
-
+// Modules
 export const getModules = async (pathId?: string): Promise<Module[]> => {
   const modules = await getFromStorage<Module>(STORAGE_KEYS.MODULES);
   return pathId ? modules.filter((m) => m.pathId === pathId) : modules;
@@ -214,16 +180,18 @@ export const saveModule = async (module: Module) => {
   await saveToStorage(STORAGE_KEYS.MODULES, modules);
 };
 
-// ─── Lessons ──────────────────────────────────────────────────────────────────
+export const deleteModule = async (id: string) => {
+  const modules = await getModules();
+  await saveToStorage(
+    STORAGE_KEYS.MODULES,
+    modules.filter((m) => m.id !== id)
+  );
+};
 
+// Lessons
 export const getLessons = async (moduleId?: string): Promise<Lesson[]> => {
   const lessons = await getFromStorage<Lesson>(STORAGE_KEYS.LESSONS);
   return moduleId ? lessons.filter((l) => l.moduleId === moduleId) : lessons;
-};
-
-export const getLesson = async (id: string): Promise<Lesson | null> => {
-  const lessons = await getLessons();
-  return lessons.find((l) => l.id === id) ?? null;
 };
 
 export const saveLesson = async (lesson: Lesson) => {
@@ -234,8 +202,15 @@ export const saveLesson = async (lesson: Lesson) => {
   await saveToStorage(STORAGE_KEYS.LESSONS, lessons);
 };
 
-// ─── Flashcards ───────────────────────────────────────────────────────────────
+export const deleteLesson = async (id: string) => {
+  const lessons = await getLessons();
+  await saveToStorage(
+    STORAGE_KEYS.LESSONS,
+    lessons.filter((l) => l.id !== id)
+  );
+};
 
+// Flashcards
 export const getFlashcards = async (lessonId?: string): Promise<Flashcard[]> => {
   const cards = await getFromStorage<Flashcard>(STORAGE_KEYS.FLASHCARDS);
   return lessonId ? cards.filter((c) => c.lessonId === lessonId) : cards;
@@ -249,14 +224,15 @@ export const saveFlashcard = async (card: Flashcard) => {
   await saveToStorage(STORAGE_KEYS.FLASHCARDS, cards);
 };
 
-export const saveFlashcardsBatch = async (cards: Flashcard[]) => {
-  const existing = await getFlashcards();
-  const merged = [...existing, ...cards];
-  await saveToStorage(STORAGE_KEYS.FLASHCARDS, merged);
+export const deleteFlashcard = async (id: string) => {
+  const cards = await getFlashcards();
+  await saveToStorage(
+    STORAGE_KEYS.FLASHCARDS,
+    cards.filter((c) => c.id !== id)
+  );
 };
 
-// ─── Quizzes ──────────────────────────────────────────────────────────────────
-
+// Quizzes
 export const getQuizzes = async (lessonId?: string): Promise<Quiz[]> => {
   const quizzes = await getFromStorage<Quiz>(STORAGE_KEYS.QUIZZES);
   return lessonId ? quizzes.filter((q) => q.lessonId === lessonId) : quizzes;
@@ -270,14 +246,15 @@ export const saveQuiz = async (quiz: Quiz) => {
   await saveToStorage(STORAGE_KEYS.QUIZZES, quizzes);
 };
 
-export const saveQuizzesBatch = async (quizzes: Quiz[]) => {
-  const existing = await getQuizzes();
-  const merged = [...existing, ...quizzes];
-  await saveToStorage(STORAGE_KEYS.QUIZZES, merged);
+export const deleteQuiz = async (id: string) => {
+  const quizzes = await getQuizzes();
+  await saveToStorage(
+    STORAGE_KEYS.QUIZZES,
+    quizzes.filter((q) => q.id !== id)
+  );
 };
 
-// ─── Progress & Stats ─────────────────────────────────────────────────────────
-
+// Progress & Stats
 export const getProgress = async (lessonId?: string): Promise<Progress[]> => {
   const progress = await getFromStorage<Progress>(STORAGE_KEYS.PROGRESS);
   return lessonId ? progress.filter((p) => p.lessonId === lessonId) : progress;
@@ -289,23 +266,70 @@ export const saveProgress = async (progress: Progress) => {
   await saveToStorage(STORAGE_KEYS.PROGRESS, all);
 };
 
-export const getStats = async (): Promise<Stats> => {
-  const data = await AsyncStorage.getItem(STORAGE_KEYS.STATS);
-  return data
-    ? JSON.parse(data)
-    : { totalStudyTime: 0, totalAnswers: 0, correctAnswers: 0, streak: 0, lastStudyDate: "" };
-};
-
-export const updateStats = async (updates: Partial<Stats>) => {
-  const stats = await getStats();
-  await AsyncStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify({ ...stats, ...updates }));
-};
-
 export const getWrongAnswers = async (): Promise<Progress[]> => {
   return (await getProgress()).filter((p) => !p.isCorrect);
 };
 
-// ─── Utility ──────────────────────────────────────────────────────────────────
+export const getStats = async (): Promise<Stats> => {
+  const data = await AsyncStorage.getItem(STORAGE_KEYS.STATS);
+  return data
+    ? JSON.parse(data)
+    : {
+        totalStudyTime: 0,
+        totalAnswers: 0,
+        correctAnswers: 0,
+        streak: 0,
+        lastStudyDate: "",
+      };
+};
 
-export const generateId = () =>
-  `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+export const updateStats = async (updates: Partial<Stats>) => {
+  const stats = await getStats();
+  const updated = { ...stats, ...updates };
+  await AsyncStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(updated));
+};
+
+export const clearAllData = async () => {
+  await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
+};
+
+// ─── Notes (Catatan) ───────────────────────────────────────────
+export const getNotes = async (lessonId?: string): Promise<Note[]> => {
+  const notes = await getFromStorage<Note>(STORAGE_KEYS.NOTES);
+  return lessonId ? notes.filter((n) => n.lessonId === lessonId) : notes;
+};
+
+export const saveNote = async (note: Note) => {
+  const notes = await getNotes();
+  const index = notes.findIndex((n) => n.id === note.id);
+  if (index >= 0) notes[index] = note;
+  else notes.push(note);
+  await saveToStorage(STORAGE_KEYS.NOTES, notes);
+};
+
+export const deleteNote = async (id: string) => {
+  const notes = await getNotes();
+  await saveToStorage(STORAGE_KEYS.NOTES, notes.filter((n) => n.id !== id));
+};
+
+// ─── Study Materials (Materi Belajar) ──────────────────────────
+export const getStudyMaterials = async (lessonId?: string): Promise<StudyMaterial[]> => {
+  const mats = await getFromStorage<StudyMaterial>(STORAGE_KEYS.STUDY_MATERIALS);
+  return lessonId ? mats.filter((m) => m.lessonId === lessonId) : mats;
+};
+
+export const saveStudyMaterial = async (mat: StudyMaterial) => {
+  const mats = await getStudyMaterials();
+  const index = mats.findIndex((m) => m.id === mat.id);
+  if (index >= 0) mats[index] = mat;
+  else mats.push(mat);
+  await saveToStorage(STORAGE_KEYS.STUDY_MATERIALS, mats);
+};
+
+export const deleteStudyMaterial = async (id: string) => {
+  const mats = await getStudyMaterials();
+  await saveToStorage(
+    STORAGE_KEYS.STUDY_MATERIALS,
+    mats.filter((m) => m.id !== id)
+  );
+};

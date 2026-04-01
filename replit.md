@@ -1,6 +1,6 @@
-# MobileLearning App
+# LearningPath App
 
-Aplikasi belajar mobile (Expo React Native) dengan flashcard, quiz, dan learning path management.
+Aplikasi belajar mobile (Expo React Native) dari repo https://github.com/rizkinabawi/LearningPath.
 
 ## Architecture
 
@@ -11,105 +11,77 @@ Aplikasi belajar mobile (Expo React Native) dengan flashcard, quiz, dan learning
 
 ### Mobile App Stack
 - **Expo SDK 54** + **Expo Router v6** (file-based routing)
-- **NativeWind v4** + **TailwindCSS v3** (styling via className)
-- **lucide-react-native** (icons — NOT @expo/vector-icons)
-- **AsyncStorage** (all data stored locally — no backend/database)
-- **expo-file-system** (image/file storage)
-- **expo-document-picker** (JSON file import)
+- **React Native StyleSheet** (styling — NO NativeWind/TailwindCSS)
+- **@expo/vector-icons** Feather icons
+- **lucide-react-native** (juga digunakan di beberapa komponen)
+- **AsyncStorage** (semua data lokal — tidak ada backend)
+- **expo-file-system**, **expo-document-picker**, **expo-sharing**, **expo-print**
+- **jszip** (zip export)
+- **expo-clipboard** (copy to clipboard)
 
 ## Key Features
-1. **Onboarding** — first launch wizard, saved to AsyncStorage
+1. **Onboarding** — wizard multi-step saat pertama kali buka
 2. **Learning Path** — hierarki Path → Module → Lesson
-3. **Flashcard Player** — flip animation, mark known/unknown
-4. **Quiz Player** — multiple choice, score tracking, results screen
-5. **Upload Batch JSON** — import flashcard/quiz dari file .json (strict format)
-6. **Prompt Builder** — generate AI prompts yang output JSON siap upload
-7. **Mistakes Review** — review ulang jawaban yang salah
-8. **AdMob Banner** — placeholder component (untuk production: react-native-google-mobile-ads)
-
-## JSON Batch Format
-
-### Flashcard
-```json
-{
-  "lessonId": "<lessonId>",
-  "flashcards": [
-    { "question": "...", "answer": "...", "tag": "Key Concept" }
-  ]
-}
-```
-Valid tags: `"Key Concept"`, `"Syntax"`, `"Vocabulary"`, `"Example"`, `"Pitfall"`
-
-### Quiz
-```json
-{
-  "lessonId": "<lessonId>",
-  "quizzes": [
-    {
-      "question": "...",
-      "options": ["A", "B", "C", "D"],
-      "answer": "A",
-      "type": "multiple-choice"
-    }
-  ]
-}
-```
-- `answer` harus sama persis dengan salah satu value di `options`
-- `type`: `"multiple-choice"` atau `"true-false"`
-- Untuk `true-false`: options wajib `["True", "False"]`
-
-## AdMob Setup (Production)
-Untuk production build, tambahkan di `app.json`:
-```json
-"plugins": [
-  ["react-native-google-mobile-ads", {
-    "androidAppId": "ca-app-pub-XXXXXXXX~XXXXXXXX",
-    "iosAppId": "ca-app-pub-XXXXXXXX~XXXXXXXX"
-  }]
-]
-```
-Test Ad Unit IDs:
-- Android Banner: `ca-app-pub-3940256099942544/6300978111`
-- iOS Banner: `ca-app-pub-3940256099942544/2934735716`
+3. **Flashcard Player** — flip card, tandai tahu/tidak tahu
+4. **Quiz Player** — pilihan ganda, tracking skor
+5. **Create Flashcard** — input manual flashcard per lesson
+6. **Create Quiz** — input manual quiz per lesson
+7. **Notes** — catatan per lesson
+8. **Study Material** — materi belajar (text/html/file) per lesson
+9. **Prompt Builder** — generate AI prompt untuk buat soal, dengan JSON export/zip
+10. **Mistakes Review** — review ulang jawaban yang salah
+11. **Progress Dashboard** — statistik, streak, akurasi, difficulty classifier
+12. **Report Generator** — export laporan belajar
 
 ## File Structure (Mobile)
 ```
 artifacts/mobile/
   app/
-    _layout.tsx              # Root layout + onboarding guard
-    onboarding.tsx           # First-launch wizard
+    _layout.tsx                    # Root layout (fonts, providers, splash)
+    onboarding.tsx                 # Multi-step wizard onboarding
+    mistakes-review.tsx            # Review jawaban salah
     (tabs)/
-      _layout.tsx            # Tab bar (Home, Belajar, Progress, Menu)
-      index.tsx              # Dashboard
-      learn.tsx              # Learning Path manager
-      progress.tsx           # Stats & mistakes
-      profile.tsx            # User profile & reset
-    flashcard/[lessonId].tsx # Flashcard player (flip animation)
-    quiz/[lessonId].tsx      # Quiz player
-    create-flashcard/[lessonId].tsx  # Manual flashcard input
-    create-quiz/[lessonId].tsx       # Manual quiz input
-    upload-batch/[lessonId].tsx      # JSON batch import (KEY FEATURE)
-    mistakes-review.tsx      # Review jawaban salah
+      _layout.tsx                  # Tab bar (Home, Belajar, Latihan, Progress, Menu)
+      index.tsx                    # Dashboard (stats, tips, quick access)
+      learn.tsx                    # Learning Path CRUD manager
+      practice.tsx                 # Practice hub (flashcard & quiz selection)
+      progress.tsx                 # Progress stats + PromptBuilder + AI prompts
+      profile.tsx                  # Profil user, edit, share, export, reset
+    flashcard/[lessonId].tsx       # Flashcard player
+    quiz/[lessonId].tsx            # Quiz player
+    create-flashcard/[lessonId].tsx # Input manual flashcard
+    create-quiz/[lessonId].tsx      # Input manual quiz
+    notes/[lessonId].tsx           # Catatan per lesson
+    study-material/[lessonId].tsx  # Materi belajar per lesson
   components/
-    Button.tsx               # Reusable button (NativeWind + CVA)
-    Card.tsx                 # Card container
-    Progress.tsx             # Progress bar
-    AdBanner.tsx             # AdMob placeholder
-    PromptBuilder.tsx        # AI prompt generator (JSON-format aware)
+    Button.tsx
+    Card.tsx
+    ErrorBoundary.tsx
+    ErrorFallback.tsx
+    KeyboardAwareScrollViewCompat.tsx
+    ProgressBar.tsx
+    PromptBuilder.tsx              # AI prompt generator + JSON/ZIP export
+    Toast.tsx                      # Global toast notifications
+  constants/
+    colors.ts                      # Design tokens (flat color palette)
+  hooks/
+    useColors.ts                   # Returns Colors object
   utils/
-    storage.ts               # AsyncStorage helpers + type definitions
-    prompt-templates.ts      # Prompt templates with JSON output format
-    validateBatchJSON.ts     # Strict JSON validator (Indonesian error msgs)
-    cn.ts                    # Tailwind class merger
-    permissions.ts           # Media/storage permission helpers
-  global.css                 # NativeWind Tailwind directives
-  tailwind.config.js         # TailwindCSS v3 config
-  babel.config.js            # NativeWind babel plugin
-  metro.config.js            # NativeWind metro config
+    storage.ts                     # AsyncStorage helpers + type definitions
+    prompt-templates.ts            # AI prompt templates
+    difficulty-classifier.ts       # Klasifikasi kesulitan soal
+    report-generator.ts            # Generate HTML report
+    json-export.ts                 # Export JSON (share/clipboard)
+    zip-handler.ts                 # ZIP export
+  babel.config.js                  # Standard expo preset (NO nativewind)
+  metro.config.js                  # Standard expo metro (NO withNativeWind)
 ```
 
 ## Development Notes
-- NativeWind v4 requires TailwindCSS v3 (NOT v4)
-- React Native Reanimated v4 does NOT use the babel plugin
-- All routing uses Expo Router v6 file-based conventions
-- `@/` alias maps to the artifact root (`artifacts/mobile/`)
+- **TIDAK menggunakan NativeWind/TailwindCSS** — murni React Native StyleSheet
+- **TIDAK ada global.css** — tidak diperlukan
+- Routing: Expo Router v6 file-based
+- `@/` alias → `artifacts/mobile/`
+- Onboarding redirect: jika tidak ada user di AsyncStorage → `/onboarding`
+- Icons: Feather dari `@expo/vector-icons`
+- Data: hanya AsyncStorage, tidak ada API/database

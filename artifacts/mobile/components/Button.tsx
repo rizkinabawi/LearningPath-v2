@@ -1,56 +1,92 @@
 import React from "react";
-import { ActivityIndicator, Pressable, PressableProps, Text } from "react-native";
-import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/utils/cn";
+import {
+  Pressable,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
+  PressableProps,
+  ViewStyle,
+} from "react-native";
+import Colors from "@/constants/colors";
 
-const buttonVariants = cva(
-  "flex-row items-center justify-center rounded-2xl px-4 py-3 active:opacity-75",
-  {
-    variants: {
-      variant: {
-        default: "bg-black",
-        outline: "border-2 border-gray-200 bg-white",
-        ghost: "bg-transparent",
-        danger: "bg-red-500",
-        primary: "bg-indigo-600",
-      },
-      size: {
-        default: "h-12",
-        sm: "h-10 px-3",
-        lg: "h-14 px-8 rounded-3xl",
-        icon: "h-10 w-10 p-0",
-      },
-    },
-    defaultVariants: { variant: "default", size: "default" },
-  }
-);
+type Variant = "default" | "outline" | "ghost" | "danger" | "accent";
+type Size = "default" | "sm" | "lg" | "icon" | "pill";
 
-interface ButtonProps extends PressableProps, VariantProps<typeof buttonVariants> {
+interface ButtonProps extends PressableProps {
   children?: React.ReactNode;
-  className?: string;
+  variant?: Variant;
+  size?: Size;
   loading?: boolean;
+  label?: string;
+  style?: ViewStyle;
 }
 
-export const Button = ({ children, variant, size, className, loading, disabled, ...props }: ButtonProps) => (
-  <Pressable
-    className={cn(buttonVariants({ variant, size, className }), disabled || loading ? "opacity-50" : "")}
-    disabled={!!loading || !!disabled}
-    {...props}
-  >
-    {loading ? (
-      <ActivityIndicator color={variant === "outline" || variant === "ghost" ? "#000" : "#fff"} />
-    ) : typeof children === "string" ? (
-      <Text
-        className={cn(
-          "font-black text-center",
-          variant === "outline" || variant === "ghost" ? "text-black" : "text-white",
-          size === "sm" ? "text-sm" : "text-base"
-        )}
-      >
-        {children}
-      </Text>
-    ) : (
-      children
-    )}
-  </Pressable>
-);
+export const Button = ({
+  children,
+  variant = "default",
+  size = "default",
+  loading = false,
+  label,
+  style,
+  disabled,
+  ...props
+}: ButtonProps) => {
+  const bg = {
+    default: Colors.primary,
+    outline: Colors.white,
+    ghost: "transparent",
+    danger: Colors.danger,
+    accent: Colors.accent,
+  }[variant];
+
+  const textColor = {
+    default: "#fff",
+    outline: Colors.text,
+    ghost: Colors.textSecondary,
+    danger: "#fff",
+    accent: "#fff",
+  }[variant];
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.base,
+        styles[`size_${size}` as keyof typeof styles] as ViewStyle,
+        { backgroundColor: bg },
+        variant === "outline" && styles.outlineBorder,
+        disabled || loading ? styles.disabled : {},
+        pressed && !disabled && !loading ? styles.pressed : {},
+        style ?? {},
+      ]}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading ? (
+        <ActivityIndicator color={variant === "default" || variant === "accent" ? "#fff" : Colors.text} />
+      ) : label ? (
+        <Text style={[styles.label, { color: textColor }]}>{label}</Text>
+      ) : (
+        children
+      )}
+    </Pressable>
+  );
+};
+
+const styles = StyleSheet.create({
+  base: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    paddingHorizontal: 20,
+  },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  disabled: { opacity: 0.5 },
+  outlineBorder: { borderWidth: 1.5, borderColor: Colors.border },
+  label: { fontWeight: "800", fontSize: 15, textAlign: "center" },
+  size_default: { height: 52 },
+  size_sm: { height: 38, paddingHorizontal: 14 },
+  size_lg: { height: 58, paddingHorizontal: 36 },
+  size_pill: { height: 40, paddingHorizontal: 18 },
+  size_icon: { height: 44, width: 44, padding: 0, paddingHorizontal: 0, borderRadius: 14 },
+});

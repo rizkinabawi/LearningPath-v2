@@ -1,26 +1,30 @@
 import React from "react";
-import { View, ViewProps } from "react-native";
-import { cn } from "@/utils/cn";
+import { View, ViewProps, StyleSheet } from "react-native";
+import Colors from "@/constants/colors";
 
 interface CardProps extends ViewProps {
   children?: React.ReactNode;
-  className?: string;
 }
 
-export const Card = ({ children, className, ...props }: CardProps) => (
-  <View className={cn("bg-white rounded-[2.5rem] shadow-sm overflow-hidden", className)} {...props}>
+export const Card = ({ children, style, ...props }: CardProps) => (
+  <View style={[styles.card, style]} {...props}>
     {children}
   </View>
 );
 
-export const CardHeader = ({ children, className, ...props }: CardProps) => (
-  <View className={cn("p-6 pb-2", className)} {...props}>{children}</View>
+export const CardContent = ({ children, style, ...props }: CardProps) => (
+  <View style={[styles.content, style]} {...props}>
+    {children}
+  </View>
 );
 
-export const CardTitle = ({ children, className, ...props }: CardProps) => (
-  <View className={cn("font-black tracking-tight", className)} {...props}>{children}</View>
-);
-
-export const CardContent = ({ children, className, ...props }: CardProps) => (
-  <View className={cn("p-6 pt-0", className)} {...props}>{children}</View>
-);
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+  content: {
+    padding: 20,
+  },
+});
