@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "b8ozwnso4C-A2ywTW67cs"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "learning app icon"
+
+[[generated]]
+id = "Bm1jfdTPRJUdhGm_PSlt_"
+uri = "file://artifacts/mobile/assets/images/splash.png"
+type = "image"
+title = "splash screen background"
