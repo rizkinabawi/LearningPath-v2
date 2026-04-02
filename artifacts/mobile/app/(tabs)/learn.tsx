@@ -28,7 +28,7 @@ import Colors from "@/constants/colors";
 const GRAD_PALETTE: [string, string][] = [
   ["#4A9EFF", "#6C63FF"],
   ["#FF6B6B", "#FF9500"],
-  ["#0AD3C1", "#00B4D8"],
+  ["#38BDF8", "#0EA5E9"],
   ["#7C3AED", "#A855F7"],
   ["#059669", "#10B981"],
 ];

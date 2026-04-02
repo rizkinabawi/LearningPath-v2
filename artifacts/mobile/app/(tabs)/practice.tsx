@@ -18,12 +18,14 @@ const MODES = [
     label: "Flashcard",
     sub: "Review kartu pertanyaan",
     gradient: ["#4C6FFF", "#7C47FF"] as [string, string],
+    route: "/flashcard/browse-all",
   },
   {
     icon: "help-circle" as const,
     label: "Quiz",
     sub: "Pilihan ganda & benar/salah",
     gradient: ["#FF6B6B", "#FF9500"] as [string, string],
+    route: "/quiz/browse-all",
   },
   {
     icon: "repeat" as const,
@@ -37,6 +39,7 @@ const MODES = [
     label: "Latihan Cepat",
     sub: "5 soal acak dari semua materi",
     gradient: ["#FF9500", "#F59E0B"] as [string, string],
+    route: "/(tabs)/learn",
   },
 ];
 

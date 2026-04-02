@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,8 +14,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { captureRef } from "react-native-view-shot";
+import * as Sharing from "expo-sharing";
 import { PromptBuilder } from "@/components/PromptBuilder";
-import { getStats, getProgress, type Stats, type Progress } from "@/utils/storage";
+import {
+  getStats, getProgress, getUser, getLearningPaths, getModules, getLessons,
+  type Stats, type Progress, type User, type LearningPath,
+} from "@/utils/storage";
 import { classifyAllItems, type DifficultyStats } from "@/utils/difficulty-classifier";
 import { generateReportHTML } from "@/utils/report-generator";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -24,22 +29,42 @@ import { toast } from "@/components/Toast";
 
 type Tab = "stats" | "classify" | "prompts";
 
+interface PathStat {
+  path: LearningPath;
+  correct: number;
+  wrong: number;
+  total: number;
+}
+
 const DIFF_CONFIG = {
-  mudah:  { label: "Mudah",  color: "#0AD3C1", bg: "#E0FAF8", icon: "trending-up"  as const, emoji: "✅" },
-  sedang: { label: "Sedang", color: "#FF9500", bg: "#FFF8EB", icon: "minus-circle"  as const, emoji: "⚡" },
-  susah:  { label: "Susah",  color: "#FF6B6B", bg: "#FFF0F0", icon: "alert-triangle" as const, emoji: "🔥" },
+  mudah:  { label: "Mudah",  color: Colors.teal, bg: Colors.tealLight, icon: "trending-up"  as const, emoji: "✅" },
+  sedang: { label: "Sedang", color: "#FF9500",  bg: "#FFF8EB",         icon: "minus-circle"  as const, emoji: "⚡" },
+  susah:  { label: "Susah",  color: "#FF6B6B",  bg: "#FFF0F0",         icon: "alert-triangle" as const, emoji: "🔥" },
 };
+
+const SHARE_GRADS: [string, string][] = [
+  ["#4C6FFF", "#7C47FF"],
+  ["#FF6B6B", "#FF9500"],
+  ["#38BDF8", "#0EA5E9"],
+  ["#7C3AED", "#A855F7"],
+  ["#10B981", "#059669"],
+  ["#F59E0B", "#EF4444"],
+];
 
 export default function ProgressTab() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
   const params = useLocalSearchParams<{ tab?: string }>();
+  const shareCardRef = useRef<View>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [progress, setProgress] = useState<Progress[]>([]);
   const [difficulty, setDifficulty] = useState<DifficultyStats | null>(null);
   const [tab, setTab] = useState<Tab>("stats");
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [pathStats, setPathStats] = useState<PathStat[]>([]);
   const [activeDiff, setActiveDiff] = useState<"mudah" | "sedang" | "susah">("susah");
 
   // Switch tab when navigated with ?tab= param
@@ -52,8 +77,30 @@ export default function ProgressTab() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [s, p, d] = await Promise.all([getStats(), getProgress(), classifyAllItems()]);
-      setStats(s); setProgress(p); setDifficulty(d);
+      const [s, p, d, u] = await Promise.all([getStats(), getProgress(), classifyAllItems(), getUser()]);
+      setStats(s); setProgress(p); setDifficulty(d); setUser(u);
+      // Compute per-path stats
+      const paths = await getLearningPaths();
+      const mods = await getModules();
+      const lessons = await getLessons();
+      const lessonToPath: Record<string, string> = {};
+      for (const l of lessons) {
+        const mod = mods.find((m) => m.id === l.moduleId);
+        if (mod) lessonToPath[l.id] = mod.pathId;
+      }
+      const pathMap: Record<string, PathStat> = {};
+      for (const path of paths) {
+        pathMap[path.id] = { path, correct: 0, wrong: 0, total: 0 };
+      }
+      for (const rec of p) {
+        const pathId = lessonToPath[rec.lessonId];
+        if (pathId && pathMap[pathId]) {
+          pathMap[pathId].total += 1;
+          if (rec.isCorrect) pathMap[pathId].correct += 1;
+          else pathMap[pathId].wrong += 1;
+        }
+      }
+      setPathStats(Object.values(pathMap).filter((ps) => ps.total > 0));
     })();
   }, []));
 
@@ -69,7 +116,6 @@ export default function ProgressTab() {
     setPdfLoading(true);
     try {
       const Print = await import("expo-print");
-      const Sharing = await import("expo-sharing");
       const html = await generateReportHTML();
       const { uri } = await Print.printToFileAsync({ html, base64: false });
       const canShare = await Sharing.isAvailableAsync();
@@ -83,6 +129,29 @@ export default function ProgressTab() {
       toast.error("Gagal membuat PDF");
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const handleShareImage = async () => {
+    if (Platform.OS === "web") {
+      toast.info("Share gambar hanya tersedia di iOS/Android");
+      return;
+    }
+    if (!shareCardRef.current) return;
+    setShareLoading(true);
+    try {
+      const uri = await captureRef(shareCardRef, { format: "png", quality: 1 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Bagikan Progres" });
+        toast.success("Gambar berhasil dibagikan!");
+      } else {
+        toast.info("Sharing tidak tersedia di perangkat ini");
+      }
+    } catch {
+      toast.error("Gagal membuat gambar");
+    } finally {
+      setShareLoading(false);
     }
   };
 
@@ -125,14 +194,24 @@ export default function ProgressTab() {
             <Text style={styles.headerSub}>Perkembanganmu</Text>
             <Text style={styles.headerTitle}>Progress</Text>
           </View>
-          <TouchableOpacity onPress={handleExportPDF} style={styles.pdfBtn} activeOpacity={0.8}>
-            <LinearGradient colors={["#4A9EFF", "#6C63FF"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.pdfBtnGrad}>
-              {pdfLoading
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <><Feather name="download" size={14} color="#fff" /><Text style={styles.pdfBtnText}>PDF</Text></>
-              }
-            </LinearGradient>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity onPress={handleShareImage} style={styles.pdfBtn} activeOpacity={0.8}>
+              <LinearGradient colors={["#38BDF8", "#0EA5E9"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.pdfBtnGrad}>
+                {shareLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <><Feather name="image" size={14} color="#fff" /><Text style={styles.pdfBtnText}>Bagikan</Text></>
+                }
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleExportPDF} style={styles.pdfBtn} activeOpacity={0.8}>
+              <LinearGradient colors={["#4A9EFF", "#6C63FF"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.pdfBtnGrad}>
+                {pdfLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <><Feather name="download" size={14} color="#fff" /><Text style={styles.pdfBtnText}>PDF</Text></>
+                }
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Hero: Ring + Stat chips */}
@@ -146,14 +225,14 @@ export default function ProgressTab() {
               </View>
             </View>
             {/* Arc decoration */}
-            <View style={[styles.ringArc, { borderColor: accuracy >= 70 ? "#0AD3C1" : accuracy >= 40 ? "#FF9500" : "#FF6B6B" }]} />
+            <View style={[styles.ringArc, { borderColor: accuracy >= 70 ? Colors.teal : accuracy >= 40 ? "#FF9500" : "#FF6B6B" }]} />
           </View>
 
           {/* 4 stat chips */}
           <View style={styles.chipsGrid}>
             {[
               { icon: "message-circle" as const, val: stats?.totalAnswers ?? 0, lbl: "Jawaban", grad: ["#4A9EFF","#6C63FF"] as [string,string] },
-              { icon: "check-circle"   as const, val: stats?.correctAnswers ?? 0, lbl: "Benar",   grad: ["#0AD3C1","#00B4D8"] as [string,string] },
+              { icon: "check-circle"   as const, val: stats?.correctAnswers ?? 0, lbl: "Benar",   grad: [Colors.teal,"#0EA5E9"] as [string,string] },
               { icon: "x-circle"       as const, val: wrong,                     lbl: "Salah",   grad: ["#FF6B6B","#EF4444"] as [string,string] },
               { icon: "activity"       as const, val: stats?.streak ?? 0,        lbl: "Streak",  grad: ["#FF9500","#FF6B6B"] as [string,string] },
             ].map((c, i) => (
@@ -210,7 +289,7 @@ export default function ProgressTab() {
             <View style={styles.barChartWrap}>
               {weeklyBars.map((b, i) => {
                 const h = Math.max(4, (b.pct / maxPct) * 80);
-                const col = b.pct >= 70 ? "#0AD3C1" : b.pct >= 40 ? "#FF9500" : b.pct === 0 ? "#E2E8F0" : "#FF6B6B";
+                const col = b.pct >= 70 ? Colors.teal : b.pct >= 40 ? "#FF9500" : b.pct === 0 ? "#E2E8F0" : "#FF6B6B";
                 return (
                   <View key={i} style={styles.barCol}>
                     <Text style={[styles.barValText, { color: col }]}>{b.pct > 0 ? `${b.pct}` : ""}</Text>
@@ -228,7 +307,7 @@ export default function ProgressTab() {
           <View style={styles.card}>
             <View style={styles.cardHead}>
               <View style={styles.cardHeadLeft}>
-                <LinearGradient colors={["#0AD3C1","#00B4D8"]} style={styles.cardHeadIcon}>
+                <LinearGradient colors={[Colors.teal,"#0EA5E9"]} style={styles.cardHeadIcon}>
                   <Feather name="target" size={13} color="#fff" />
                 </LinearGradient>
                 <Text style={styles.cardTitle}>Akurasi Keseluruhan</Text>
@@ -238,7 +317,7 @@ export default function ProgressTab() {
             <View style={{ marginTop: 4 }}>
               <ProgressBar
                 value={accuracy}
-                color={accuracy >= 70 ? "#0AD3C1" : accuracy >= 40 ? "#FF9500" : "#FF6B6B"}
+                color={accuracy >= 70 ? Colors.teal : accuracy >= 40 ? "#FF9500" : "#FF6B6B"}
                 height={10}
                 backgroundColor={Colors.border}
               />
@@ -265,7 +344,7 @@ export default function ProgressTab() {
                       key={i}
                       style={[
                         styles.heatCell,
-                        { width: cellSize, height: cellSize, backgroundColor: p.isCorrect ? "#0AD3C1" : "#FF6B6B" },
+                        { width: cellSize, height: cellSize, backgroundColor: p.isCorrect ? Colors.teal : "#FF6B6B" },
                       ]}
                     />
                   );
@@ -273,7 +352,7 @@ export default function ProgressTab() {
               </View>
               <View style={styles.heatLegend}>
                 <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: "#0AD3C1" }]} />
+                  <View style={[styles.legendDot, { backgroundColor: Colors.teal }]} />
                   <Text style={styles.legendText}>Benar</Text>
                 </View>
                 <View style={styles.legendItem}>
@@ -298,7 +377,7 @@ export default function ProgressTab() {
               </View>
               {recent.slice(0, 10).map((p, i) => (
                 <View key={i} style={[styles.logRow, i < Math.min(10, recent.length) - 1 && styles.logRowBorder]}>
-                  <View style={[styles.logDot, { backgroundColor: p.isCorrect ? "#0AD3C1" : "#FF6B6B" }]} />
+                  <View style={[styles.logDot, { backgroundColor: p.isCorrect ? Colors.teal : "#FF6B6B" }]} />
                   <Feather name={p.flashcardId ? "credit-card" : "help-circle"} size={13} color={Colors.textMuted} />
                   <Text style={styles.logDate}>{new Date(p.timestamp).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</Text>
                   <Text style={[styles.logResult, { color: p.isCorrect ? "#059669" : "#DC2626" }]}>
@@ -388,7 +467,7 @@ export default function ProgressTab() {
                 <View style={styles.cardHead}>
                   <View style={styles.cardHeadLeft}>
                     <LinearGradient
-                      colors={activeDiff === "mudah" ? ["#0AD3C1","#00B4D8"] : activeDiff === "sedang" ? ["#FF9500","#FF6B6B"] : ["#FF6B6B","#EF4444"]}
+                      colors={activeDiff === "mudah" ? [Colors.teal,"#0EA5E9"] : activeDiff === "sedang" ? ["#FF9500","#FF6B6B"] : ["#FF6B6B","#EF4444"]}
                       style={styles.cardHeadIcon}
                     >
                       <Feather name={cfg.icon} size={13} color="#fff" />
@@ -431,6 +510,97 @@ export default function ProgressTab() {
       )}
 
       {tab === "prompts" && <PromptBuilder />}
+
+      {/* ===== HIDDEN SHARE CARD (captured by react-native-view-shot) ===== */}
+      <View
+        ref={shareCardRef}
+        collapsable={false}
+        style={styles.shareCardWrap}
+      >
+        <LinearGradient colors={["#0F1F3D", "#1E3A5F"]} style={styles.shareCard}>
+          {/* Header */}
+          <LinearGradient colors={["#4C6FFF", "#7C47FF"]} style={styles.shareBanner}>
+            <Text style={styles.shareAppName}>📚 MobileLearning</Text>
+            <Text style={styles.shareTagline}>Laporan Progres Belajar</Text>
+          </LinearGradient>
+
+          {/* User */}
+          <View style={styles.shareUserRow}>
+            <LinearGradient colors={["#4C6FFF", "#7C47FF"]} style={styles.shareAvatar}>
+              <Text style={styles.shareAvatarText}>
+                {(user?.name ?? "U").charAt(0).toUpperCase()}
+              </Text>
+            </LinearGradient>
+            <View>
+              <Text style={styles.shareUserName}>{user?.name ?? "Pengguna"}</Text>
+              <Text style={styles.shareUserLevel}>
+                {user?.level === "beginner" ? "Pemula" : user?.level === "intermediate" ? "Menengah" : "Mahir"}
+                {user?.goal ? ` · ${user.goal}` : ""}
+              </Text>
+            </View>
+          </View>
+
+          {/* Big accuracy */}
+          <View style={styles.shareAccRow}>
+            <View style={styles.shareAccBox}>
+              <Text style={styles.shareAccVal}>{accuracy}%</Text>
+              <Text style={styles.shareAccLbl}>Akurasi</Text>
+            </View>
+            <View style={styles.shareStatGrid}>
+              <View style={[styles.shareStatBox, { backgroundColor: Colors.teal + "22" }]}>
+                <Feather name="check-circle" size={16} color={Colors.teal} />
+                <Text style={[styles.shareStatVal, { color: Colors.teal }]}>{stats?.correctAnswers ?? 0}</Text>
+                <Text style={styles.shareStatLbl}>Benar</Text>
+              </View>
+              <View style={[styles.shareStatBox, { backgroundColor: "#FF6B6B22" }]}>
+                <Feather name="x-circle" size={16} color="#FF6B6B" />
+                <Text style={[styles.shareStatVal, { color: "#FF6B6B" }]}>{wrong}</Text>
+                <Text style={styles.shareStatLbl}>Salah</Text>
+              </View>
+              <View style={[styles.shareStatBox, { backgroundColor: "#4C6FFF22" }]}>
+                <Feather name="book-open" size={16} color="#4C6FFF" />
+                <Text style={[styles.shareStatVal, { color: "#4C6FFF" }]}>{stats?.totalAnswers ?? 0}</Text>
+                <Text style={styles.shareStatLbl}>Total</Text>
+              </View>
+              <View style={[styles.shareStatBox, { backgroundColor: "#FF950022" }]}>
+                <Feather name="zap" size={16} color="#FF9500" />
+                <Text style={[styles.shareStatVal, { color: "#FF9500" }]}>{stats?.streak ?? 0}</Text>
+                <Text style={styles.shareStatLbl}>Streak</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Per-course */}
+          {pathStats.length > 0 && (
+            <View style={styles.shareCourseSect}>
+              <Text style={styles.shareSectTitle}>Per Kursus</Text>
+              {pathStats.slice(0, 4).map((ps, i) => {
+                const pct = ps.total > 0 ? Math.round((ps.correct / ps.total) * 100) : 0;
+                const g = SHARE_GRADS[i % SHARE_GRADS.length];
+                return (
+                  <View key={ps.path.id} style={styles.shareCourseRow}>
+                    <LinearGradient colors={g} style={styles.shareCourseIcon}>
+                      <Text style={{ fontSize: 12 }}>{ps.path.name.charAt(0).toUpperCase()}</Text>
+                    </LinearGradient>
+                    <Text style={styles.shareCourseName} numberOfLines={1}>{ps.path.name}</Text>
+                    <Text style={[styles.shareCourseAcc, { color: pct >= 70 ? Colors.teal : pct >= 40 ? "#FF9500" : "#FF6B6B" }]}>
+                      {pct}%
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Footer */}
+          <View style={styles.shareFooter}>
+            <Text style={styles.shareFooterDate}>
+              {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+            </Text>
+            <Text style={styles.shareFooterApp}>MobileLearning App</Text>
+          </View>
+        </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -439,7 +609,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   headerGrad: { paddingHorizontal: 20, paddingBottom: 0, overflow: "hidden" },
   hDot1: { position: "absolute", width: 180, height: 180, borderRadius: 90, backgroundColor: "rgba(74,158,255,0.1)", top: -50, right: -50 },
-  hDot2: { position: "absolute", width: 110, height: 110, borderRadius: 55, backgroundColor: "rgba(10,211,193,0.07)", bottom: -20, left: 20 },
+  hDot2: { position: "absolute", width: 110, height: 110, borderRadius: 55, backgroundColor: "rgba(56,189,248,0.07)", bottom: -20, left: 20 },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
   headerSub: { fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: "700", textTransform: "uppercase", letterSpacing: 1 },
   headerTitle: { fontSize: 24, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
@@ -513,4 +683,45 @@ const styles = StyleSheet.create({
   classifyAcc: { fontSize: 11, fontWeight: "800" },
   accuracyPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   accuracyPillText: { fontSize: 12, fontWeight: "900" },
+
+  // Share card (hidden off-screen, captured by react-native-view-shot)
+  shareCardWrap: {
+    position: "absolute",
+    left: -9999,
+    top: 0,
+    width: 360,
+  },
+  shareCard: { borderRadius: 24, overflow: "hidden" },
+  shareBanner: { paddingHorizontal: 20, paddingVertical: 16, alignItems: "center" },
+  shareAppName: { fontSize: 18, fontWeight: "900", color: "#fff", letterSpacing: -0.3 },
+  shareTagline: { fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: "600", marginTop: 2 },
+  shareUserRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
+  shareAvatar: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  shareAvatarText: { fontSize: 22, fontWeight: "900", color: "#fff" },
+  shareUserName: { fontSize: 17, fontWeight: "900", color: "#fff" },
+  shareUserLevel: { fontSize: 12, color: "rgba(255,255,255,0.6)", fontWeight: "600", marginTop: 2 },
+  shareAccRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingBottom: 16 },
+  shareAccBox: {
+    width: 100, height: 100, borderRadius: 50, backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center", justifyContent: "center",
+  },
+  shareAccVal: { fontSize: 28, fontWeight: "900", color: "#fff" },
+  shareAccLbl: { fontSize: 10, color: "rgba(255,255,255,0.5)", fontWeight: "700", textTransform: "uppercase" },
+  shareStatGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  shareStatBox: { width: "46%", borderRadius: 12, padding: 10, alignItems: "center", gap: 2 },
+  shareStatVal: { fontSize: 18, fontWeight: "900" },
+  shareStatLbl: { fontSize: 9, color: "rgba(255,255,255,0.55)", fontWeight: "700", textTransform: "uppercase" },
+  shareCourseSect: { paddingHorizontal: 20, paddingBottom: 16 },
+  shareSectTitle: { fontSize: 11, color: "rgba(255,255,255,0.4)", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 },
+  shareCourseRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  shareCourseIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  shareCourseName: { flex: 1, fontSize: 13, fontWeight: "700", color: "#fff" },
+  shareCourseAcc: { fontSize: 13, fontWeight: "900" },
+  shareFooter: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 20, paddingVertical: 12,
+    borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)",
+  },
+  shareFooterDate: { fontSize: 11, color: "rgba(255,255,255,0.35)", fontWeight: "600" },
+  shareFooterApp: { fontSize: 11, color: "rgba(255,255,255,0.35)", fontWeight: "700" },
 });

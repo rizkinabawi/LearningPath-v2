@@ -68,6 +68,7 @@
     "expo-sharing": "^14.0.8",
     "jszip": "^3.10.1",
     "lucide-react-native": "^1.7.0",
+    "react-native-view-shot": "^4.0.3",
     "tailwind-merge": "catalog:"
   }
 }

@@ -4,8 +4,8 @@ const Colors = {
   primaryLight: "#EEF0FF",
   accent: "#FF6B6B",
   accentLight: "#FFF0F0",
-  teal: "#0AD3C1",
-  tealLight: "#E0FAF8",
+  teal: "#38BDF8",
+  tealLight: "#E0F2FE",
   amber: "#FF9500",
   amberLight: "#FFF8EB",
   purple: "#7C3AED",
@@ -33,18 +33,18 @@ const Colors = {
   tabInactive: "#99AAC3",
   card1: "#4C6FFF",
   card2: "#FF9500",
-  card3: "#0AD3C1",
+  card3: "#38BDF8",
   card4: "#7C3AED",
 };
 
 export default Colors;
 
-export const CARD_COLORS = ["#4C6FFF", "#FF6B6B", "#0AD3C1", "#7C3AED", "#10B981", "#FF9500"];
+export const CARD_COLORS = ["#4C6FFF", "#FF6B6B", "#38BDF8", "#7C3AED", "#10B981", "#FF9500"];
 
 export const CARD_GRADIENTS: [string, string][] = [
   ["#4C6FFF", "#7C47FF"],
   ["#FF6B6B", "#FF9500"],
-  ["#0AD3C1", "#00B4D8"],
+  ["#38BDF8", "#0EA5E9"],
   ["#7C3AED", "#A855F7"],
   ["#10B981", "#059669"],
   ["#F59E0B", "#EF4444"],

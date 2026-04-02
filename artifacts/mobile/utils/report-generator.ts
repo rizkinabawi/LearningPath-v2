@@ -35,7 +35,7 @@ function buildDonutChart(correct: number, wrong: number): string {
 
   return `<svg width="140" height="140" xmlns="http://www.w3.org/2000/svg">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="18"/>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#0AD3C1" stroke-width="18"
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#38BDF8" stroke-width="18"
       stroke-dasharray="${correctArc} ${wrongArc}"
       stroke-dashoffset="${circumference * 0.25}"
       stroke-linecap="round"/>
@@ -60,7 +60,7 @@ function buildActivityHeatmap(progress: { timestamp: string; isCorrect: boolean 
 
   const cells = last14.map((day, i) => {
     const acc = day.total === 0 ? -1 : day.correct / day.total;
-    const color = day.total === 0 ? "#E2E8F0" : acc >= 0.7 ? "#0AD3C1" : acc >= 0.4 ? "#FF9500" : "#FF6B6B";
+    const color = day.total === 0 ? "#E2E8F0" : acc >= 0.7 ? "#38BDF8" : acc >= 0.4 ? "#FF9500" : "#FF6B6B";
     const label = new Date(day.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
     const x = 10 + i * 37;
     return `
@@ -96,12 +96,12 @@ export async function generateReportHTML(): Promise<string> {
       label: d.toLocaleDateString("id-ID", { weekday: "short" }),
       value: dayAcc,
       max: 100,
-      color: dayAcc >= 70 ? "#0AD3C1" : dayAcc >= 40 ? "#FF9500" : dayAcc === 0 ? "#E2E8F0" : "#FF6B6B",
+      color: dayAcc >= 70 ? "#38BDF8" : dayAcc >= 40 ? "#FF9500" : dayAcc === 0 ? "#E2E8F0" : "#FF6B6B",
     });
   }
 
   const diffBarData = [
-    { label: "Mudah", value: difficulty.mudah.length, max: difficulty.total || 1, color: "#0AD3C1" },
+    { label: "Mudah", value: difficulty.mudah.length, max: difficulty.total || 1, color: "#38BDF8" },
     { label: "Sedang", value: difficulty.sedang.length, max: difficulty.total || 1, color: "#FF9500" },
     { label: "Susah", value: difficulty.susah.length, max: difficulty.total || 1, color: "#FF6B6B" },
   ];
@@ -189,7 +189,7 @@ export async function generateReportHTML(): Promise<string> {
       <div class="section-title">Ringkasan Utama</div>
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-val" style="color:#4A9EFF">${accuracy}%</div><div class="kpi-lbl">Akurasi</div></div>
-        <div class="kpi"><div class="kpi-val" style="color:#0AD3C1">${stats?.correctAnswers ?? 0}</div><div class="kpi-lbl">Benar</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:#38BDF8">${stats?.correctAnswers ?? 0}</div><div class="kpi-lbl">Benar</div></div>
         <div class="kpi"><div class="kpi-val" style="color:#FF6B6B">${wrong}</div><div class="kpi-lbl">Salah</div></div>
         <div class="kpi"><div class="kpi-val" style="color:#FF9500">${stats?.streak ?? 0}</div><div class="kpi-lbl">Streak</div></div>
       </div>
@@ -205,7 +205,7 @@ export async function generateReportHTML(): Promise<string> {
             <div class="chart-title">Konten Tersedia</div>
             <div style="display:flex;gap:20px;flex-wrap:wrap">
               <div><span style="font-size:20px;font-weight:900;color:#4A9EFF">${paths.length}</span><br/><span style="font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase">Kursus</span></div>
-              <div><span style="font-size:20px;font-weight:900;color:#0AD3C1">${flashcards.length}</span><br/><span style="font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase">Flashcard</span></div>
+              <div><span style="font-size:20px;font-weight:900;color:#38BDF8">${flashcards.length}</span><br/><span style="font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase">Flashcard</span></div>
               <div><span style="font-size:20px;font-weight:900;color:#FF9500">${quizzes.length}</span><br/><span style="font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase">Soal Quiz</span></div>
             </div>
           </div>
@@ -229,7 +229,7 @@ export async function generateReportHTML(): Promise<string> {
       <div class="chart-card">
         ${heatmapSVG}
         <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:3px;background:#0AD3C1"></div><span style="font-size:10px;color:#94A3B8;font-weight:600">≥70% benar</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:3px;background:#38BDF8"></div><span style="font-size:10px;color:#94A3B8;font-weight:600">≥70% benar</span></div>
           <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:3px;background:#FF9500"></div><span style="font-size:10px;color:#94A3B8;font-weight:600">40–69% benar</span></div>
           <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:3px;background:#FF6B6B"></div><span style="font-size:10px;color:#94A3B8;font-weight:600">&lt;40% benar</span></div>
           <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:3px;background:#E2E8F0"></div><span style="font-size:10px;color:#94A3B8;font-weight:600">Tidak ada aktivitas</span></div>
@@ -257,7 +257,7 @@ export async function generateReportHTML(): Promise<string> {
           </tr></thead>
           <tbody>${susahRows}</tbody>
         </table>
-      </div>` : `<div style="text-align:center;padding:20px;color:#0AD3C1;font-weight:700">🎉 Tidak ada soal sulit — performa sangat baik!</div>`}
+      </div>` : `<div style="text-align:center;padding:20px;color:#38BDF8;font-weight:700">🎉 Tidak ada soal sulit — performa sangat baik!</div>`}
     </div>
 
     <!-- RECENT ACTIVITY TABLE -->
