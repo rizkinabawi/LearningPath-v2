@@ -249,6 +249,10 @@ function RootLayoutNav() {
         name="mistakes-review"
         options={{ headerShown: false, presentation: "modal" }}
       />
+      <Stack.Screen
+        name="course/[pathId]"
+        options={{ headerShown: false, animation: "slide_from_right" }}
+      />
     </Stack>
   );
 }

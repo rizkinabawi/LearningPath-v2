@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -18,75 +18,65 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getLearningPaths, getModules, getLessons,
-  getFlashcards, getQuizzes, getNotes, getStudyMaterials,
-  saveLearningPath, saveModule, saveLesson, deleteLearningPath,
-  deleteModule, deleteLesson,
-  generateId, type LearningPath, type Module, type Lesson,
+  getFlashcards, getQuizzes,
+  saveLearningPath, deleteLearningPath,
+  generateId, type LearningPath,
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 
-const GRAD_PALETTE: [string, string][] = [
-  ["#4A9EFF", "#6C63FF"],
+const COURSE_GRADIENTS: [string, string][] = [
+  ["#4C6FFF", "#7C47FF"],
   ["#FF6B6B", "#FF9500"],
   ["#38BDF8", "#0EA5E9"],
   ["#7C3AED", "#A855F7"],
   ["#059669", "#10B981"],
+  ["#F59E0B", "#EF4444"],
+  ["#06B6D4", "#3B82F6"],
+  ["#EC4899", "#8B5CF6"],
 ];
 
-type ModCounts = { fc: number; qz: number; nt: number; mt: number };
+const COURSE_EMOJIS = ["📘", "🎨", "🌐", "🧠", "⚗️", "🚀", "💡", "🎯"];
+
+interface CourseStats {
+  modules: number;
+  lessons: number;
+  flashcards: number;
+  quizzes: number;
+}
 
 export default function LearnPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
-  const [paths, setPaths] = useState<LearningPath[]>([]);
-  const [activePath, setActivePath] = useState<LearningPath | null>(null);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [lessons, setLessons] = useState<Record<string, Lesson[]>>({});
-  const [counts, setCounts] = useState<Record<string, ModCounts>>({});
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
+  const [paths, setPaths] = useState<LearningPath[]>([]);
+  const [stats, setStats] = useState<Record<string, CourseStats>>({});
   const [showNewPath, setShowNewPath] = useState(false);
-  const [showNewModule, setShowNewModule] = useState(false);
-  const [showNewLesson, setShowNewLesson] = useState(false);
   const [pathName, setPathName] = useState("");
   const [pathDesc, setPathDesc] = useState("");
-  const [modName, setModName] = useState("");
-  const [lessonName, setLessonName] = useState("");
-  const [lessonDesc, setLessonDesc] = useState("");
-  const [targetMod, setTargetMod] = useState<string | null>(null);
 
-  const loadPaths = async () => {
+  const loadData = async () => {
     const data = await getLearningPaths();
     setPaths(data);
-    if (data.length > 0 && !activePath) setActivePath(data[0]);
-  };
-
-  const loadModules = async () => {
-    if (!activePath) return;
-    const mods = (await getModules(activePath.id)).sort((a, b) => a.order - b.order);
-    setModules(mods);
-    const lMap: Record<string, Lesson[]> = {};
-    const cMap: Record<string, ModCounts> = {};
-    for (const mod of mods) {
-      const ls = await getLessons(mod.id);
-      lMap[mod.id] = ls.sort((a, b) => a.order - b.order);
-      let fc = 0, qz = 0, nt = 0, mt = 0;
-      for (const l of ls) {
-        fc += (await getFlashcards(l.id)).length;
-        qz += (await getQuizzes(l.id)).length;
-        nt += (await getNotes(l.id)).length;
-        mt += (await getStudyMaterials(l.id)).length;
+    const sMap: Record<string, CourseStats> = {};
+    for (const p of data) {
+      const mods = await getModules(p.id);
+      let lessons = 0, flashcards = 0, quizzes = 0;
+      for (const m of mods) {
+        const ls = await getLessons(m.id);
+        lessons += ls.length;
+        for (const l of ls) {
+          flashcards += (await getFlashcards(l.id)).length;
+          quizzes += (await getQuizzes(l.id)).length;
+        }
       }
-      cMap[mod.id] = { fc, qz, nt, mt };
+      sMap[p.id] = { modules: mods.length, lessons, flashcards, quizzes };
     }
-    setLessons(lMap);
-    setCounts(cMap);
+    setStats(sMap);
   };
 
-  useFocusEffect(useCallback(() => { loadPaths(); }, []));
-  useEffect(() => { if (activePath) loadModules(); }, [activePath]);
+  useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const createPath = async () => {
     if (!pathName.trim()) return;
@@ -97,410 +87,281 @@ export default function LearnPage() {
     };
     await saveLearningPath(p);
     setPathName(""); setPathDesc(""); setShowNewPath(false);
-    const updated = await getLearningPaths();
-    setPaths(updated); setActivePath(p);
+    loadData();
   };
 
-  const createModule = async () => {
-    if (!modName.trim() || !activePath) return;
-    const m: Module = {
-      id: generateId(), pathId: activePath.id,
-      name: modName.trim(), description: "",
-      order: modules.length, createdAt: new Date().toISOString(),
-    };
-    await saveModule(m);
-    setModName(""); setShowNewModule(false);
-    loadModules();
-  };
-
-  const createLesson = async () => {
-    if (!lessonName.trim() || !targetMod) return;
-    const l: Lesson = {
-      id: generateId(), moduleId: targetMod,
-      name: lessonName.trim(), description: lessonDesc.trim(),
-      order: (lessons[targetMod] ?? []).length,
-      createdAt: new Date().toISOString(),
-    };
-    await saveLesson(l);
-    setLessonName(""); setLessonDesc(""); setShowNewLesson(false);
-    loadModules();
-  };
-
-  const handleDeleteModule = (mod: Module) => {
+  const handleDelete = (p: LearningPath) => {
     Alert.alert(
-      "Hapus Modul",
-      `Hapus modul "${mod.name}"? Semua pelajaran, flashcard, quiz, dan materi di dalamnya akan ikut terhapus.`,
+      "Hapus Kursus",
+      `Hapus "${p.name}"? Semua modul, pelajaran, dan materi di dalamnya akan ikut terhapus.`,
       [
         { text: "Batal", style: "cancel" },
         {
           text: "Hapus", style: "destructive",
           onPress: async () => {
-            await deleteModule(mod.id);
-            loadModules();
+            await deleteLearningPath(p.id);
+            loadData();
           },
         },
       ]
     );
   };
 
-  const handleDeleteLesson = (lesson: Lesson) => {
-    Alert.alert(
-      "Hapus Pelajaran",
-      `Hapus pelajaran "${lesson.name}"? Flashcard, quiz, catatan, dan materi di dalamnya akan ikut terhapus.`,
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Hapus", style: "destructive",
-          onPress: async () => {
-            await deleteLesson(lesson.id);
-            loadModules();
-          },
-        },
-      ]
-    );
-  };
+  const numCols = isTablet ? 2 : 1;
 
   return (
     <View style={styles.container}>
-      {/* GRADIENT HEADER */}
+      {/* HEADER */}
       <LinearGradient
         colors={["#4C6FFF", "#7C47FF"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.headerGrad, { paddingTop: Platform.OS === "web" ? 60 : insets.top + 12 }]}
+        style={[styles.header, { paddingTop: Platform.OS === "web" ? 60 : insets.top + 14 }]}
       >
         <View style={styles.hdot1} />
         <View style={styles.hdot2} />
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.headerSub}>Kurikulum</Text>
+            <Text style={styles.headerSub}>KURIKULUM</Text>
             <Text style={styles.headerTitle}>My Courses</Text>
           </View>
-          <TouchableOpacity onPress={() => setShowNewPath(true)} style={styles.addBtn} activeOpacity={0.8}>
-            <LinearGradient colors={["#4A9EFF", "#6C63FF"]} style={styles.addGrad}>
-              <Feather name="plus" size={20} color="#fff" />
+          <TouchableOpacity
+            onPress={() => setShowNewPath(true)}
+            style={styles.addBtn}
+            activeOpacity={0.8}
+          >
+            <LinearGradient colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]} style={styles.addGrad}>
+              <Feather name="plus" size={22} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>
         </View>
-
         {paths.length > 0 && (
-          <ScrollView
-            horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.pathTabsContent}
-            style={styles.pathTabsScroll}
-          >
-            {paths.map((p) => (
-              <TouchableOpacity
-                key={p.id}
-                onPress={() => setActivePath(p)}
-                onLongPress={() => Alert.alert("Hapus", `Hapus "${p.name}"?`, [
-                  { text: "Batal", style: "cancel" },
-                  { text: "Hapus", style: "destructive", onPress: async () => {
-                    await deleteLearningPath(p.id);
-                    const u = await getLearningPaths();
-                    setPaths(u); setActivePath(u[0] ?? null);
-                  }},
-                ])}
-                style={[styles.pathTab, activePath?.id === p.id && styles.pathTabActive]}
-                activeOpacity={0.7}
-              >
-                {activePath?.id === p.id && <View style={styles.pathTabDot} />}
-                <Text style={[styles.pathTabText, activePath?.id === p.id && styles.pathTabTextActive]} numberOfLines={1}>
-                  {p.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <Text style={styles.headerCount}>{paths.length} kursus tersedia</Text>
         )}
       </LinearGradient>
 
+      {/* COURSE LIST */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
-          { padding: isTablet ? 24 : 16, paddingBottom: 40 },
+          styles.scrollContent,
           isTablet && { maxWidth: 1100, alignSelf: "center", width: "100%" },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {paths.length === 0 && (
+        {paths.length === 0 ? (
+          /* Empty state */
           <TouchableOpacity onPress={() => setShowNewPath(true)} activeOpacity={0.85}>
-            <LinearGradient colors={["#4A9EFF", "#6C63FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyGrad}>
+            <LinearGradient
+              colors={["#4A9EFF", "#6C63FF"]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.emptyCard}
+            >
               <View style={styles.hdot1} /><View style={styles.hdot2} />
-              <Feather name="plus-circle" size={36} color="rgba(255,255,255,0.9)" />
-              <Text style={styles.emptyGradTitle}>Buat Kursus Pertama</Text>
-              <Text style={styles.emptyGradSub}>Tap untuk membuat jalur belajarmu</Text>
+              <View style={styles.emptyIconWrap}>
+                <Feather name="plus-circle" size={40} color="rgba(255,255,255,0.9)" />
+              </View>
+              <Text style={styles.emptyTitle}>Buat Kursus Pertama</Text>
+              <Text style={styles.emptySub}>Tap untuk membuat jalur belajarmu sendiri</Text>
             </LinearGradient>
           </TouchableOpacity>
-        )}
+        ) : (
+          <View style={isTablet ? styles.tabletGrid : undefined}>
+            {paths.map((p, idx) => {
+              const grad = COURSE_GRADIENTS[idx % COURSE_GRADIENTS.length];
+              const emoji = COURSE_EMOJIS[idx % COURSE_EMOJIS.length];
+              const s = stats[p.id] ?? { modules: 0, lessons: 0, flashcards: 0, quizzes: 0 };
 
-        {/* Tablet: 2-column module grid */}
-        <View style={isTablet ? styles.tabletGrid : undefined}>
-          {modules.map((mod, mi) => {
-            const isExpanded = !!expanded[mod.id];
-            const modLessons = lessons[mod.id] ?? [];
-            const cnt = counts[mod.id] ?? { fc: 0, qz: 0, nt: 0, mt: 0 };
-            const grad = GRAD_PALETTE[mi % GRAD_PALETTE.length];
-
-            return (
-              <View key={mod.id} style={[styles.moduleCard, isTablet && styles.moduleCardTablet]}>
-                <View style={styles.moduleHeader}>
-                  <TouchableOpacity
-                    onPress={() => setExpanded((p) => ({ ...p, [mod.id]: !p[mod.id] }))}
-                    style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 12 }}
-                    activeOpacity={0.7}
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  onPress={() => router.push(`/course/${p.id}`)}
+                  onLongPress={() => handleDelete(p)}
+                  activeOpacity={0.92}
+                  style={[styles.courseCard, isTablet && styles.courseCardTablet]}
+                >
+                  <LinearGradient
+                    colors={grad}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.courseGrad}
                   >
-                    <LinearGradient colors={grad} style={styles.modIconGrad}>
-                      <Text style={{ fontSize: 16 }}>
-                        {["📘","🎨","🌐","🧠","⚗️"][mi % 5]}
-                      </Text>
-                    </LinearGradient>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.moduleName}>{mod.name}</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={styles.moduleMetaRow}>
-                          <View style={styles.metaChip}><Text style={styles.metaChipText}>{modLessons.length} Pelajaran</Text></View>
-                          <View style={styles.metaChip}><Text style={styles.metaChipText}>{cnt.fc} Kartu</Text></View>
-                          <View style={styles.metaChip}><Text style={styles.metaChipText}>{cnt.qz} Quiz</Text></View>
-                          <View style={[styles.metaChip, { backgroundColor: "#EEF0FF" }]}><Text style={[styles.metaChipText, { color: Colors.primary }]}>{cnt.nt} Catatan</Text></View>
-                          <View style={[styles.metaChip, { backgroundColor: Colors.purpleLight }]}><Text style={[styles.metaChipText, { color: Colors.purple }]}>{cnt.mt} Materi</Text></View>
-                        </View>
-                      </ScrollView>
-                    </View>
-                  </TouchableOpacity>
-                  {/* Delete module */}
-                  <TouchableOpacity
-                    onPress={() => handleDeleteModule(mod)}
-                    style={styles.modDeleteBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Feather name="trash-2" size={14} color={Colors.danger} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setExpanded((p) => ({ ...p, [mod.id]: !p[mod.id] }))}>
-                    <Feather name={isExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
+                    {/* Decorative circles */}
+                    <View style={styles.cardCircle1} />
+                    <View style={styles.cardCircle2} />
 
-                {isExpanded && (
-                  <View style={styles.lessonList}>
-                    {modLessons.map((lesson, li) => (
-                      <View key={lesson.id} style={styles.lessonRow}>
-                        <LinearGradient colors={grad} style={styles.lessonNum}>
-                          <Text style={styles.lessonNumText}>{li + 1}</Text>
-                        </LinearGradient>
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <View style={styles.lessonTitleRow}>
-                            <Text style={[styles.lessonName, { flex: 1 }]} numberOfLines={1}>{lesson.name}</Text>
-                            <TouchableOpacity
-                              onPress={() => handleDeleteLesson(lesson)}
-                              style={styles.lessonDeleteBtn}
-                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                            >
-                              <Feather name="trash-2" size={12} color={Colors.danger} />
-                            </TouchableOpacity>
-                          </View>
-                          {lesson.description ? (
-                            <Text style={styles.lessonDesc} numberOfLines={1}>{lesson.description}</Text>
-                          ) : null}
-
-                          {/* Action row */}
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-                            <View style={styles.actionRow}>
-                              <TouchableOpacity
-                                onPress={() => router.push(`/notes/${lesson.id}`)}
-                                style={[styles.actionPill, styles.pillNote]}
-                                activeOpacity={0.75}
-                              >
-                                <Text style={styles.actionPillText}>📝 Catatan</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                onPress={() => router.push(`/study-material/${lesson.id}`)}
-                                style={[styles.actionPill, styles.pillMaterial]}
-                                activeOpacity={0.75}
-                              >
-                                <Text style={styles.actionPillText}>📚 Materi</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                onPress={() => router.push(`/flashcard/${lesson.id}`)}
-                                style={[styles.actionPill, styles.pillCard]}
-                                activeOpacity={0.75}
-                              >
-                                <Text style={styles.actionPillText}>🃏 Kartu</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                onPress={() => router.push(`/quiz/${lesson.id}`)}
-                                style={[styles.actionPill, styles.pillQuiz]}
-                                activeOpacity={0.75}
-                              >
-                                <Text style={styles.actionPillText}>❓ Quiz</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                onPress={() => router.push(`/create-quiz/${lesson.id}`)}
-                                style={[styles.actionPill, styles.pillAdd]}
-                                activeOpacity={0.75}
-                              >
-                                <Feather name="plus" size={11} color={Colors.primary} />
-                                <Text style={[styles.actionPillText, { color: Colors.primary }]}>Soal</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </ScrollView>
-                        </View>
+                    {/* Top row: emoji icon + arrow */}
+                    <View style={styles.cardTopRow}>
+                      <View style={styles.courseIconWrap}>
+                        <Text style={styles.courseEmoji}>{emoji}</Text>
                       </View>
-                    ))}
+                      <View style={styles.arrowWrap}>
+                        <Feather name="arrow-right" size={18} color="rgba(255,255,255,0.8)" />
+                      </View>
+                    </View>
 
-                    <TouchableOpacity
-                      style={styles.addLessonRow}
-                      onPress={() => { setTargetMod(mod.id); setShowNewLesson(true); }}
-                    >
-                      <Feather name="plus-circle" size={15} color={Colors.primary} />
-                      <Text style={styles.addLessonText}>Tambah Pelajaran</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
-          })}
-        </View>
+                    {/* Course name & description */}
+                    <Text style={styles.courseName} numberOfLines={2}>{p.name}</Text>
+                    {!!p.description && (
+                      <Text style={styles.courseDesc} numberOfLines={2}>{p.description}</Text>
+                    )}
 
-        {activePath && (
-          <TouchableOpacity style={styles.addModBtn} onPress={() => setShowNewModule(true)}>
-            <Feather name="plus" size={15} color={Colors.primary} />
-            <Text style={styles.addModText}>Tambah Modul Baru</Text>
-          </TouchableOpacity>
+                    {/* Stats row */}
+                    <View style={styles.statsRow}>
+                      <StatPill icon="layers" value={s.modules} label="Modul" />
+                      <StatPill icon="book" value={s.lessons} label="Pelajaran" />
+                      <StatPill icon="credit-card" value={s.flashcards} label="Kartu" />
+                      <StatPill icon="help-circle" value={s.quizzes} label="Quiz" />
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Add another course card */}
+            <TouchableOpacity
+              onPress={() => setShowNewPath(true)}
+              activeOpacity={0.8}
+              style={[styles.addMoreCard, isTablet && styles.courseCardTablet]}
+            >
+              <Feather name="plus-circle" size={22} color={Colors.primary} />
+              <Text style={styles.addMoreText}>Tambah Kursus Baru</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
-      {/* MODALS */}
-      {[
-        {
-          vis: showNewPath, title: "📚 Kursus Baru",
-          close: () => setShowNewPath(false), save: createPath,
-          body: (
-            <>
-              <TextInput placeholder="Nama kursus" value={pathName} onChangeText={setPathName} style={styles.mInput} placeholderTextColor={Colors.textMuted} autoFocus />
-              <TextInput placeholder="Deskripsi (opsional)" value={pathDesc} onChangeText={setPathDesc} style={styles.mInput} placeholderTextColor={Colors.textMuted} />
-            </>
-          ),
-        },
-        {
-          vis: showNewModule, title: "📂 Modul Baru",
-          close: () => setShowNewModule(false), save: createModule,
-          body: (
-            <TextInput placeholder="Nama modul" value={modName} onChangeText={setModName} style={styles.mInput} placeholderTextColor={Colors.textMuted} autoFocus />
-          ),
-        },
-        {
-          vis: showNewLesson, title: "📝 Pelajaran Baru",
-          close: () => setShowNewLesson(false), save: createLesson,
-          body: (
-            <>
-              <TextInput placeholder="Nama pelajaran" value={lessonName} onChangeText={setLessonName} style={styles.mInput} placeholderTextColor={Colors.textMuted} autoFocus />
-              <TextInput placeholder="Deskripsi (opsional)" value={lessonDesc} onChangeText={setLessonDesc} style={styles.mInput} placeholderTextColor={Colors.textMuted} />
-            </>
-          ),
-        },
-      ].map((m) => (
-        <Modal key={m.title} visible={m.vis} transparent animationType="slide">
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-          >
-            <View style={styles.mOverlay}>
-              <View style={styles.mBox}>
-                <Text style={styles.mTitle}>{m.title}</Text>
-                {m.body}
-                <View style={styles.mBtns}>
-                  <TouchableOpacity onPress={m.close} style={styles.mBtnCancel}>
-                    <Text style={styles.mBtnCancelText}>Batal</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={m.save} style={styles.mBtnOk}>
-                    <LinearGradient colors={["#4A9EFF", "#6C63FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.mBtnOkGrad}>
-                      <Text style={styles.mBtnOkText}>Simpan</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
+      {/* MODAL: New Course */}
+      <Modal visible={showNewPath} transparent animationType="slide">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <View style={styles.mOverlay}>
+            <View style={styles.mBox}>
+              <Text style={styles.mTitle}>📚 Kursus Baru</Text>
+              <TextInput
+                placeholder="Nama kursus" value={pathName}
+                onChangeText={setPathName} style={styles.mInput}
+                placeholderTextColor={Colors.textMuted} autoFocus
+              />
+              <TextInput
+                placeholder="Deskripsi (opsional)" value={pathDesc}
+                onChangeText={setPathDesc} style={styles.mInput}
+                placeholderTextColor={Colors.textMuted}
+              />
+              <View style={styles.mBtns}>
+                <TouchableOpacity onPress={() => { setShowNewPath(false); setPathName(""); setPathDesc(""); }} style={styles.mBtnCancel}>
+                  <Text style={styles.mBtnCancelText}>Batal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={createPath} style={styles.mBtnOk}>
+                  <LinearGradient colors={["#4A9EFF", "#6C63FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.mBtnOkGrad}>
+                    <Text style={styles.mBtnOkText}>Buat Kursus</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      ))}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  );
+}
+
+function StatPill({ icon, value, label }: { icon: React.ComponentProps<typeof Feather>["name"]; value: number; label: string }) {
+  return (
+    <View style={styles.statPill}>
+      <Feather name={icon} size={10} color="rgba(255,255,255,0.75)" />
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  headerGrad: { paddingHorizontal: 20, paddingBottom: 16, overflow: "hidden" },
-  hdot1: { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: "rgba(74,158,255,0.1)", top: -40, right: -40 },
-  hdot2: { position: "absolute", width: 100, height: 100, borderRadius: 50, backgroundColor: "rgba(108,99,255,0.08)", top: 10, right: 60 },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-  headerSub: { fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: "700", textTransform: "uppercase", letterSpacing: 1 },
-  headerTitle: { fontSize: 24, fontWeight: "900", color: "#fff", letterSpacing: -0.4 },
-  addBtn: { borderRadius: 14, overflow: "hidden" },
-  addGrad: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  pathTabsScroll: { height: 38 },
-  pathTabsContent: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 },
-  pathTab: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.1)", height: 36 },
-  pathTabActive: { backgroundColor: "rgba(255,255,255,0.2)", borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
-  pathTabDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary },
-  pathTabText: { fontSize: 13, fontWeight: "700", color: "rgba(255,255,255,0.65)", maxWidth: 120 },
-  pathTabTextActive: { color: "#fff" },
+
+  header: { paddingHorizontal: 20, paddingBottom: 20, overflow: "hidden" },
+  hdot1: { position: "absolute", width: 200, height: 200, borderRadius: 100, backgroundColor: "rgba(255,255,255,0.06)", top: -60, right: -50 },
+  hdot2: { position: "absolute", width: 120, height: 120, borderRadius: 60, backgroundColor: "rgba(255,255,255,0.05)", top: 20, right: 70 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
+  headerSub: { fontSize: 11, color: "rgba(255,255,255,0.55)", fontWeight: "700", letterSpacing: 1.5, marginBottom: 4 },
+  headerTitle: { fontSize: 28, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
+  headerCount: { fontSize: 13, color: "rgba(255,255,255,0.6)", fontWeight: "600", marginTop: 2 },
+  addBtn: { borderRadius: 16, overflow: "hidden" },
+  addGrad: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+
   scroll: { flex: 1 },
-  emptyGrad: { borderRadius: 22, padding: 36, alignItems: "center", gap: 10, overflow: "hidden", marginBottom: 12 },
-  emptyGradTitle: { fontSize: 18, fontWeight: "900", color: "#fff" },
-  emptyGradSub: { fontSize: 13, color: "rgba(255,255,255,0.75)", fontWeight: "500" },
-  moduleCard: { backgroundColor: "#fff", borderRadius: 16, marginBottom: 10, overflow: "hidden", borderWidth: 1, borderColor: Colors.border },
-  tabletGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  moduleCardTablet: { width: "48.5%", marginBottom: 0 },
-  moduleHeader: { flexDirection: "row", alignItems: "center", padding: 14, gap: 10 },
-  modDeleteBtn: {
-    width: 30, height: 30, borderRadius: 8,
-    backgroundColor: Colors.dangerLight, alignItems: "center", justifyContent: "center",
-    marginRight: 4,
+  scrollContent: { padding: 16, paddingBottom: 40, gap: 12 },
+  tabletGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
+
+  emptyCard: {
+    borderRadius: 24, padding: 40, alignItems: "center",
+    gap: 10, overflow: "hidden", marginBottom: 8,
   },
-  lessonTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 1 },
-  lessonDeleteBtn: {
-    width: 24, height: 24, borderRadius: 6,
-    backgroundColor: Colors.dangerLight, alignItems: "center", justifyContent: "center",
+  emptyIconWrap: {
+    width: 72, height: 72, borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center", justifyContent: "center", marginBottom: 4,
   },
-  modIconGrad: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  moduleName: { fontSize: 15, fontWeight: "800", color: Colors.dark, marginBottom: 6 },
-  moduleMetaRow: { flexDirection: "row", gap: 5 },
-  metaChip: { backgroundColor: Colors.background, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
-  metaChipText: { fontSize: 10, fontWeight: "700", color: Colors.textSecondary },
-  lessonList: { borderTopWidth: 1, borderTopColor: Colors.border, paddingHorizontal: 14, paddingBottom: 8 },
-  lessonRow: {
-    flexDirection: "row", alignItems: "flex-start",
-    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10,
+  emptyTitle: { fontSize: 20, fontWeight: "900", color: "#fff" },
+  emptySub: { fontSize: 13, color: "rgba(255,255,255,0.7)", fontWeight: "500", textAlign: "center" },
+
+  courseCard: { borderRadius: 22, overflow: "hidden", marginBottom: 4 },
+  courseCardTablet: { width: "48.5%", marginBottom: 0 },
+  courseGrad: { padding: 22, minHeight: 180, overflow: "hidden", position: "relative" },
+  cardCircle1: {
+    position: "absolute", width: 180, height: 180, borderRadius: 90,
+    backgroundColor: "rgba(255,255,255,0.07)", top: -60, right: -50,
   },
-  lessonNum: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center", marginTop: 2 },
-  lessonNumText: { fontSize: 11, fontWeight: "900", color: "#fff" },
-  lessonName: { fontSize: 13, fontWeight: "700", color: Colors.dark },
-  lessonDesc: { fontSize: 11, color: Colors.textMuted, fontWeight: "500", marginTop: 1 },
-  actionRow: { flexDirection: "row", gap: 5, alignItems: "center" },
-  actionPill: {
+  cardCircle2: {
+    position: "absolute", width: 100, height: 100, borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.05)", bottom: -20, left: 20,
+  },
+  cardTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
+  courseIconWrap: {
+    width: 54, height: 54, borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center", justifyContent: "center",
+  },
+  courseEmoji: { fontSize: 26 },
+  arrowWrap: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center", justifyContent: "center",
+  },
+  courseName: { fontSize: 22, fontWeight: "900", color: "#fff", letterSpacing: -0.3, marginBottom: 6 },
+  courseDesc: { fontSize: 13, color: "rgba(255,255,255,0.72)", fontWeight: "500", marginBottom: 16, lineHeight: 18 },
+  statsRow: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 4 },
+  statPill: {
     flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.18)", borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 5,
   },
-  pillNote: { backgroundColor: "#EEF0FF" },
-  pillMaterial: { backgroundColor: Colors.purpleLight },
-  pillCard: { backgroundColor: Colors.primaryLight },
-  pillQuiz: { backgroundColor: Colors.amberLight },
-  pillAdd: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  actionPillText: { fontSize: 10, fontWeight: "800", color: Colors.dark },
-  addLessonRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10 },
-  addLessonText: { fontSize: 13, color: Colors.primary, fontWeight: "700" },
-  addModBtn: {
+  statValue: { fontSize: 12, fontWeight: "800", color: "#fff" },
+  statLabel: { fontSize: 10, fontWeight: "600", color: "rgba(255,255,255,0.75)" },
+
+  addMoreCard: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, paddingVertical: 14, borderRadius: 14,
-    borderWidth: 1.5, borderColor: Colors.primary, borderStyle: "dashed",
+    gap: 10, paddingVertical: 18, borderRadius: 18,
+    borderWidth: 2, borderColor: Colors.primary, borderStyle: "dashed",
+    backgroundColor: Colors.primaryLight,
+    marginBottom: 4,
   },
-  addModText: { fontSize: 13, fontWeight: "700", color: Colors.primary },
+  addMoreText: { fontSize: 14, fontWeight: "700", color: Colors.primary },
+
   mOverlay: { flex: 1, backgroundColor: "rgba(10,22,40,0.6)", justifyContent: "flex-end" },
   mBox: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, gap: 12 },
   mTitle: { fontSize: 20, fontWeight: "900", color: Colors.dark },
-  mInput: { backgroundColor: Colors.background, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, fontSize: 14, fontWeight: "600", color: Colors.dark, borderWidth: 1.5, borderColor: Colors.border },
+  mInput: {
+    backgroundColor: Colors.background, borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 13,
+    fontSize: 14, fontWeight: "600", color: Colors.dark,
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
   mBtns: { flexDirection: "row", gap: 10 },
-  mBtnCancel: { flex: 1, paddingVertical: 14, borderRadius: 999, alignItems: "center", backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  mBtnCancel: {
+    flex: 1, paddingVertical: 14, borderRadius: 999,
+    alignItems: "center", backgroundColor: Colors.background,
+    borderWidth: 1, borderColor: Colors.border,
+  },
   mBtnCancelText: { fontSize: 14, fontWeight: "700", color: Colors.textSecondary },
   mBtnOk: { flex: 1, borderRadius: 999, overflow: "hidden" },
   mBtnOkGrad: { paddingVertical: 14, alignItems: "center" },
