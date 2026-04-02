@@ -40,12 +40,27 @@ export interface Lesson {
   createdAt: string;
 }
 
+export interface FlashcardPack {
+  id: string;
+  lessonId: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface QuizPack {
+  id: string;
+  lessonId: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface Flashcard {
   id: string;
   question: string;
   answer: string;
   tag: string;
   lessonId: string;
+  packId?: string;
   image?: string;
   createdAt: string;
 }
@@ -57,6 +72,7 @@ export interface Quiz {
   answer: string;
   type: "multiple-choice" | "true-false";
   lessonId: string;
+  packId?: string;
   image?: string;
   createdAt: string;
 }
@@ -80,7 +96,6 @@ export interface Stats {
   lastStudyDate: string;
 }
 
-// Catatan per pelajaran
 export interface Note {
   id: string;
   lessonId: string;
@@ -90,18 +105,34 @@ export interface Note {
   updatedAt: string;
 }
 
-// Materi belajar per pelajaran (text / html / file)
 export interface StudyMaterial {
   id: string;
   lessonId: string;
   title: string;
-  type: "text" | "html" | "file";
-  content: string;       // text or HTML string
-  filePath?: string;     // local file path for type=file
-  fileName?: string;     // original file name
-  fileSize?: number;     // bytes
-  fileMime?: string;     // MIME type
+  type: "text" | "html" | "file" | "youtube" | "googledoc" | "image";
+  content: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileMime?: string;
+  videoUrl?: string;
+  imageLocalPath?: string;
   createdAt: string;
+}
+
+// Course Pack for export/import
+export interface CoursePack {
+  version: number;
+  exportedAt: string;
+  paths: LearningPath[];
+  modules: Module[];
+  lessons: Lesson[];
+  flashcardPacks: FlashcardPack[];
+  quizPacks: QuizPack[];
+  flashcards: Flashcard[];
+  quizzes: Quiz[];
+  materials: StudyMaterial[];
+  notes: Note[];
 }
 
 const STORAGE_KEYS = {
@@ -109,6 +140,8 @@ const STORAGE_KEYS = {
   LEARNING_PATHS: "learning_paths",
   MODULES: "modules",
   LESSONS: "lessons",
+  FLASHCARD_PACKS: "flashcard_packs",
+  QUIZ_PACKS: "quiz_packs",
   FLASHCARDS: "flashcards",
   QUIZZES: "quizzes",
   PROGRESS: "progress",
@@ -160,10 +193,7 @@ export const saveLearningPath = async (path: LearningPath) => {
 
 export const deleteLearningPath = async (id: string) => {
   const paths = await getLearningPaths();
-  await saveToStorage(
-    STORAGE_KEYS.LEARNING_PATHS,
-    paths.filter((p) => p.id !== id)
-  );
+  await saveToStorage(STORAGE_KEYS.LEARNING_PATHS, paths.filter((p) => p.id !== id));
 };
 
 // Modules
@@ -182,10 +212,7 @@ export const saveModule = async (module: Module) => {
 
 export const deleteModule = async (id: string) => {
   const modules = await getModules();
-  await saveToStorage(
-    STORAGE_KEYS.MODULES,
-    modules.filter((m) => m.id !== id)
-  );
+  await saveToStorage(STORAGE_KEYS.MODULES, modules.filter((m) => m.id !== id));
 };
 
 // Lessons
@@ -204,16 +231,61 @@ export const saveLesson = async (lesson: Lesson) => {
 
 export const deleteLesson = async (id: string) => {
   const lessons = await getLessons();
-  await saveToStorage(
-    STORAGE_KEYS.LESSONS,
-    lessons.filter((l) => l.id !== id)
-  );
+  await saveToStorage(STORAGE_KEYS.LESSONS, lessons.filter((l) => l.id !== id));
 };
 
-// Flashcards
+// ─── Flashcard Packs ───────────────────────────────────────────
+export const getFlashcardPacks = async (lessonId?: string): Promise<FlashcardPack[]> => {
+  const packs = await getFromStorage<FlashcardPack>(STORAGE_KEYS.FLASHCARD_PACKS);
+  return lessonId ? packs.filter((p) => p.lessonId === lessonId) : packs;
+};
+
+export const saveFlashcardPack = async (pack: FlashcardPack) => {
+  const packs = await getFlashcardPacks();
+  const index = packs.findIndex((p) => p.id === pack.id);
+  if (index >= 0) packs[index] = pack;
+  else packs.push(pack);
+  await saveToStorage(STORAGE_KEYS.FLASHCARD_PACKS, packs);
+};
+
+export const deleteFlashcardPack = async (packId: string) => {
+  const packs = await getFlashcardPacks();
+  await saveToStorage(STORAGE_KEYS.FLASHCARD_PACKS, packs.filter((p) => p.id !== packId));
+  // Also delete all flashcards in this pack
+  const cards = await getFromStorage<Flashcard>(STORAGE_KEYS.FLASHCARDS);
+  await saveToStorage(STORAGE_KEYS.FLASHCARDS, cards.filter((c) => c.packId !== packId));
+};
+
+// ─── Quiz Packs ────────────────────────────────────────────────
+export const getQuizPacks = async (lessonId?: string): Promise<QuizPack[]> => {
+  const packs = await getFromStorage<QuizPack>(STORAGE_KEYS.QUIZ_PACKS);
+  return lessonId ? packs.filter((p) => p.lessonId === lessonId) : packs;
+};
+
+export const saveQuizPack = async (pack: QuizPack) => {
+  const packs = await getQuizPacks();
+  const index = packs.findIndex((p) => p.id === pack.id);
+  if (index >= 0) packs[index] = pack;
+  else packs.push(pack);
+  await saveToStorage(STORAGE_KEYS.QUIZ_PACKS, packs);
+};
+
+export const deleteQuizPack = async (packId: string) => {
+  const packs = await getQuizPacks();
+  await saveToStorage(STORAGE_KEYS.QUIZ_PACKS, packs.filter((p) => p.id !== packId));
+  const quizzes = await getFromStorage<Quiz>(STORAGE_KEYS.QUIZZES);
+  await saveToStorage(STORAGE_KEYS.QUIZZES, quizzes.filter((q) => q.packId !== packId));
+};
+
+// ─── Flashcards ────────────────────────────────────────────────
 export const getFlashcards = async (lessonId?: string): Promise<Flashcard[]> => {
   const cards = await getFromStorage<Flashcard>(STORAGE_KEYS.FLASHCARDS);
   return lessonId ? cards.filter((c) => c.lessonId === lessonId) : cards;
+};
+
+export const getFlashcardsByPack = async (packId: string): Promise<Flashcard[]> => {
+  const cards = await getFromStorage<Flashcard>(STORAGE_KEYS.FLASHCARDS);
+  return cards.filter((c) => c.packId === packId);
 };
 
 export const saveFlashcard = async (card: Flashcard) => {
@@ -226,16 +298,18 @@ export const saveFlashcard = async (card: Flashcard) => {
 
 export const deleteFlashcard = async (id: string) => {
   const cards = await getFlashcards();
-  await saveToStorage(
-    STORAGE_KEYS.FLASHCARDS,
-    cards.filter((c) => c.id !== id)
-  );
+  await saveToStorage(STORAGE_KEYS.FLASHCARDS, cards.filter((c) => c.id !== id));
 };
 
-// Quizzes
+// ─── Quizzes ───────────────────────────────────────────────────
 export const getQuizzes = async (lessonId?: string): Promise<Quiz[]> => {
   const quizzes = await getFromStorage<Quiz>(STORAGE_KEYS.QUIZZES);
   return lessonId ? quizzes.filter((q) => q.lessonId === lessonId) : quizzes;
+};
+
+export const getQuizzesByPack = async (packId: string): Promise<Quiz[]> => {
+  const quizzes = await getFromStorage<Quiz>(STORAGE_KEYS.QUIZZES);
+  return quizzes.filter((q) => q.packId === packId);
 };
 
 export const saveQuiz = async (quiz: Quiz) => {
@@ -248,10 +322,7 @@ export const saveQuiz = async (quiz: Quiz) => {
 
 export const deleteQuiz = async (id: string) => {
   const quizzes = await getQuizzes();
-  await saveToStorage(
-    STORAGE_KEYS.QUIZZES,
-    quizzes.filter((q) => q.id !== id)
-  );
+  await saveToStorage(STORAGE_KEYS.QUIZZES, quizzes.filter((q) => q.id !== id));
 };
 
 // Progress & Stats
@@ -274,13 +345,7 @@ export const getStats = async (): Promise<Stats> => {
   const data = await AsyncStorage.getItem(STORAGE_KEYS.STATS);
   return data
     ? JSON.parse(data)
-    : {
-        totalStudyTime: 0,
-        totalAnswers: 0,
-        correctAnswers: 0,
-        streak: 0,
-        lastStudyDate: "",
-      };
+    : { totalStudyTime: 0, totalAnswers: 0, correctAnswers: 0, streak: 0, lastStudyDate: "" };
 };
 
 export const updateStats = async (updates: Partial<Stats>) => {
@@ -293,7 +358,7 @@ export const clearAllData = async () => {
   await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
 };
 
-// ─── Notes (Catatan) ───────────────────────────────────────────
+// ─── Notes ─────────────────────────────────────────────────────
 export const getNotes = async (lessonId?: string): Promise<Note[]> => {
   const notes = await getFromStorage<Note>(STORAGE_KEYS.NOTES);
   return lessonId ? notes.filter((n) => n.lessonId === lessonId) : notes;
@@ -312,7 +377,7 @@ export const deleteNote = async (id: string) => {
   await saveToStorage(STORAGE_KEYS.NOTES, notes.filter((n) => n.id !== id));
 };
 
-// ─── Study Materials (Materi Belajar) ──────────────────────────
+// ─── Study Materials ───────────────────────────────────────────
 export const getStudyMaterials = async (lessonId?: string): Promise<StudyMaterial[]> => {
   const mats = await getFromStorage<StudyMaterial>(STORAGE_KEYS.STUDY_MATERIALS);
   return lessonId ? mats.filter((m) => m.lessonId === lessonId) : mats;
@@ -328,8 +393,58 @@ export const saveStudyMaterial = async (mat: StudyMaterial) => {
 
 export const deleteStudyMaterial = async (id: string) => {
   const mats = await getStudyMaterials();
-  await saveToStorage(
-    STORAGE_KEYS.STUDY_MATERIALS,
-    mats.filter((m) => m.id !== id)
-  );
+  await saveToStorage(STORAGE_KEYS.STUDY_MATERIALS, mats.filter((m) => m.id !== id));
+};
+
+// ─── Course Pack Export / Import ───────────────────────────────
+export const exportCourse = async (pathId?: string): Promise<CoursePack> => {
+  const [paths, modules, lessons, flashcardPacks, quizPacks, flashcards, quizzes, materials, notes] =
+    await Promise.all([
+      getLearningPaths(),
+      getModules(),
+      getLessons(),
+      getFlashcardPacks(),
+      getQuizPacks(),
+      getFlashcards(),
+      getQuizzes(),
+      getStudyMaterials(),
+      getNotes(),
+    ]);
+
+  const filteredPaths = pathId ? paths.filter((p) => p.id === pathId) : paths;
+  const pathIds = new Set(filteredPaths.map((p) => p.id));
+  const filteredModules = modules.filter((m) => pathIds.has(m.pathId));
+  const moduleIds = new Set(filteredModules.map((m) => m.id));
+  const filteredLessons = lessons.filter((l) => moduleIds.has(l.moduleId));
+  const lessonIds = new Set(filteredLessons.map((l) => l.id));
+
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    paths: filteredPaths,
+    modules: filteredModules,
+    lessons: filteredLessons,
+    flashcardPacks: flashcardPacks.filter((p) => lessonIds.has(p.lessonId)),
+    quizPacks: quizPacks.filter((p) => lessonIds.has(p.lessonId)),
+    flashcards: flashcards.filter((c) => lessonIds.has(c.lessonId)),
+    quizzes: quizzes.filter((q) => lessonIds.has(q.lessonId)),
+    materials: materials.filter((m) => lessonIds.has(m.lessonId)),
+    notes: notes.filter((n) => lessonIds.has(n.lessonId)),
+  };
+};
+
+export const importCourse = async (pack: CoursePack): Promise<number> => {
+  let imported = 0;
+
+  for (const p of pack.paths ?? []) { await saveLearningPath(p); imported++; }
+  for (const m of pack.modules ?? []) { await saveModule(m); imported++; }
+  for (const l of pack.lessons ?? []) { await saveLesson(l); imported++; }
+  for (const p of pack.flashcardPacks ?? []) { await saveFlashcardPack(p); }
+  for (const p of pack.quizPacks ?? []) { await saveQuizPack(p); }
+  for (const c of pack.flashcards ?? []) { await saveFlashcard(c); imported++; }
+  for (const q of pack.quizzes ?? []) { await saveQuiz(q); imported++; }
+  for (const m of pack.materials ?? []) { await saveStudyMaterial(m); imported++; }
+  for (const n of pack.notes ?? []) { await saveNote(n); imported++; }
+
+  return imported;
 };

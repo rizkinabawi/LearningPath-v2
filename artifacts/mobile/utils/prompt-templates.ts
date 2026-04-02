@@ -7,41 +7,46 @@ export interface PromptTemplate {
   template: string;
 }
 
-// Format flashcard yang dibutuhkan sistem:
-// [{"question":"...","answer":"...","tag":"..."}]
-//
-// Format quiz yang dibutuhkan sistem:
-// [{"question":"...","options":["A","B","C","D"],"answer":"teks lengkap opsi A"}]
+export const LANGUAGE_OPTIONS = [
+  { id: "Bahasa Indonesia", label: "🇮🇩 Indonesia" },
+  { id: "English", label: "🇺🇸 English" },
+  { id: "Arabic", label: "🇸🇦 Arabic" },
+  { id: "Japanese", label: "🇯🇵 Japanese" },
+  { id: "Mandarin", label: "🇨🇳 Mandarin" },
+  { id: "French", label: "🇫🇷 French" },
+  { id: "German", label: "🇩🇪 German" },
+  { id: "Korean", label: "🇰🇷 Korean" },
+];
 
 export const PROMPT_TEMPLATES: PromptTemplate[] = [
-  // ── FLASHCARD TEMPLATES ─────────────────────────────────────────
+  // ── FLASHCARD TEMPLATES ──────────────────────────────────────
   {
     id: "fc-concepts",
     topic: "Umum",
     type: "flashcard",
     title: "Konsep & Definisi",
     description: "Flashcard konsep inti dan definisi",
-    template: `Buatkan 10 flashcard tentang [TOPIC] untuk level [LEVEL].
+    template: `Buatkan 10 flashcard tentang [TOPIC] untuk level [LEVEL]. Gunakan bahasa [LANGUAGE].
 Fokus pada konsep inti, definisi, dan contoh nyata.
+[CUSTOM_NOTE]
 
-PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode (\`\`\`). Langsung mulai dengan [ dan akhiri dengan ].
+PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode. Langsung mulai dengan [ dan akhiri dengan ].
 
-Format JSON yang WAJIB digunakan (contoh):
+Format JSON yang WAJIB digunakan:
 [
   {
     "question": "Apa yang dimaksud dengan fotosintesis?",
-    "answer": "Proses di mana tumbuhan mengubah cahaya matahari, air, dan CO₂ menjadi glukosa dan oksigen menggunakan klorofil.",
+    "answer": "Proses di mana tumbuhan mengubah cahaya matahari, air, dan CO₂ menjadi glukosa dan oksigen.",
     "tag": "biologi-dasar"
   }
 ]
 
 ATURAN WAJIB:
 1. Field "question": pertanyaan atau konsep yang diuji
-2. Field "answer": jawaban lengkap dan informatif (boleh beberapa kalimat)
-3. Field "tag": kata kunci singkat dengan tanda hubung jika perlu (contoh: "reaksi-kimia")
-4. Tidak ada field lain selain "question", "answer", "tag"
-5. Gunakan Bahasa Indonesia
-6. Topik: [TOPIC]`,
+2. Field "answer": jawaban lengkap dan informatif
+3. Field "tag": kata kunci singkat dengan tanda hubung
+4. Hanya field "question", "answer", "tag"
+5. Topik: [TOPIC]`,
   },
   {
     id: "fc-vocab",
@@ -49,26 +54,22 @@ ATURAN WAJIB:
     type: "flashcard",
     title: "Kosakata & Frasa",
     description: "Flashcard kosakata dan frasa penting",
-    template: `Buatkan 15 flashcard kosakata untuk belajar [TOPIC], level [LEVEL].
+    template: `Buatkan 15 flashcard kosakata untuk belajar [TOPIC], level [LEVEL]. Gunakan bahasa [LANGUAGE].
 Sertakan kata, makna, dan contoh kalimat.
+[CUSTOM_NOTE]
 
-PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode (\`\`\`). Langsung mulai dengan [ dan akhiri dengan ].
+PENTING: Balas HANYA dengan array JSON murni. Langsung mulai dengan [ dan akhiri dengan ].
 
-Format JSON yang WAJIB digunakan (contoh):
+Format JSON yang WAJIB digunakan:
 [
   {
     "question": "Apa arti kata 'Ubiquitous'?",
-    "answer": "Ada di mana-mana; hadir atau ditemukan di mana saja. Contoh kalimat: 'Smartphones have become ubiquitous in modern society.'",
-    "tag": "kosakata-inggris"
+    "answer": "Ada di mana-mana. Contoh: 'Smartphones have become ubiquitous in modern society.'",
+    "tag": "kosakata"
   }
 ]
 
-ATURAN WAJIB:
-1. Field "question": kata atau frasa yang ingin diuji
-2. Field "answer": makna lengkap + contoh kalimat
-3. Field "tag": kategori kosakata (contoh: "kosakata-inggris", "kata-sifat")
-4. Tidak ada field lain selain "question", "answer", "tag"
-5. Topik: [TOPIC]`,
+ATURAN: Hanya field "question", "answer", "tag". Topik: [TOPIC]`,
   },
   {
     id: "fc-dates",
@@ -76,93 +77,99 @@ ATURAN WAJIB:
     type: "flashcard",
     title: "Tanggal & Peristiwa",
     description: "Flashcard peristiwa historis penting",
-    template: `Buatkan 10 flashcard tentang peristiwa, tanggal, dan tokoh penting dalam [TOPIC], level [LEVEL].
+    template: `Buatkan 10 flashcard tentang peristiwa, tanggal, dan tokoh penting dalam [TOPIC], level [LEVEL]. Gunakan bahasa [LANGUAGE].
+[CUSTOM_NOTE]
 
-PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode (\`\`\`). Langsung mulai dengan [ dan akhiri dengan ].
+PENTING: Balas HANYA dengan array JSON murni. Langsung mulai dengan [ dan akhiri dengan ].
 
-Format JSON yang WAJIB digunakan (contoh):
+Format JSON:
 [
   {
-    "question": "Kapan dan di mana Proklamasi Kemerdekaan Indonesia dibacakan?",
-    "answer": "17 Agustus 1945, di Jalan Pegangsaan Timur No. 56, Jakarta, oleh Soekarno dan Mohammad Hatta.",
-    "tag": "sejarah-indonesia"
+    "question": "Kapan Proklamasi Kemerdekaan Indonesia dibacakan?",
+    "answer": "17 Agustus 1945, di Jakarta, oleh Soekarno dan Mohammad Hatta.",
+    "tag": "sejarah"
   }
 ]
 
-ATURAN WAJIB:
-1. Field "question": pertanyaan tentang tanggal, tokoh, atau peristiwa
-2. Field "answer": penjelasan lengkap beserta konteks dan dampaknya
-3. Field "tag": kategori sejarah (contoh: "sejarah-indonesia", "perang-dunia")
-4. Tidak ada field lain selain "question", "answer", "tag"
-5. Topik: [TOPIC]`,
+ATURAN: Hanya field "question", "answer", "tag". Topik: [TOPIC]`,
+  },
+  {
+    id: "fc-formula",
+    topic: "Sains",
+    type: "flashcard",
+    title: "Rumus & Formula",
+    description: "Flashcard rumus sains dan matematika",
+    template: `Buatkan 10 flashcard tentang rumus dan formula dalam [TOPIC], level [LEVEL]. Gunakan bahasa [LANGUAGE].
+[CUSTOM_NOTE]
+
+PENTING: Balas HANYA dengan array JSON murni. Langsung mulai dengan [ dan akhiri dengan ].
+
+Format JSON:
+[
+  {
+    "question": "Apa rumus luas lingkaran?",
+    "answer": "L = π × r², di mana r adalah jari-jari lingkaran dan π ≈ 3.14.",
+    "tag": "matematika"
+  }
+]
+
+ATURAN: Hanya field "question", "answer", "tag". Topik: [TOPIC]`,
   },
 
-  // ── QUIZ TEMPLATES ──────────────────────────────────────────────
+  // ── QUIZ TEMPLATES ───────────────────────────────────────────
   {
     id: "qz-mcq",
     topic: "Umum",
     type: "quiz",
     title: "Pilihan Ganda",
     description: "Quiz pilihan ganda dengan 4 opsi",
-    template: `Buatkan 10 soal pilihan ganda tentang [TOPIC] untuk level [LEVEL].
+    template: `Buatkan 10 soal pilihan ganda tentang [TOPIC] untuk level [LEVEL]. Gunakan bahasa [LANGUAGE].
+[CUSTOM_NOTE]
 
-PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode (\`\`\`). Langsung mulai dengan [ dan akhiri dengan ].
+PENTING: Balas HANYA dengan array JSON murni. Langsung mulai dengan [ dan akhiri dengan ].
 
-Format JSON yang WAJIB digunakan (contoh):
+Format JSON yang WAJIB digunakan:
 [
   {
-    "question": "Apa fungsi dari useEffect di React?",
+    "question": "Apa fungsi utama mitokondria dalam sel?",
     "options": [
-      "Mengelola side effects setelah render",
-      "Menyimpan state lokal komponen",
-      "Membuat elemen DOM baru",
-      "Menghapus komponen dari tree"
+      "Menghasilkan energi (ATP) melalui respirasi seluler",
+      "Menyimpan informasi genetik",
+      "Mengontrol masuk keluarnya zat dari sel",
+      "Mensintesis protein"
     ],
-    "answer": "Mengelola side effects setelah render"
+    "answer": "Menghasilkan energi (ATP) melalui respirasi seluler"
   }
 ]
 
 ATURAN WAJIB:
-1. Field "question": string berisi pertanyaan
-2. Field "options": array berisi TEPAT 4 string (teks lengkap, BUKAN huruf A/B/C/D)
-3. Field "answer": string IDENTIK SAMA PERSIS dengan salah satu elemen di array "options"
-4. JANGAN tulis "A", "B", "C", "D" sebagai nilai "answer" — tulis teks lengkap opsinya
-5. Tidak ada field lain selain "question", "options", "answer"
-6. Gunakan Bahasa Indonesia
-7. Topik: [TOPIC]`,
+1. Field "question": string pertanyaan
+2. Field "options": array TEPAT 4 string (teks lengkap, bukan huruf A/B/C/D)
+3. Field "answer": string IDENTIK SAMA PERSIS dengan salah satu elemen "options"
+4. Hanya field "question", "options", "answer"
+5. Topik: [TOPIC]`,
   },
   {
-    id: "qz-prog",
-    topic: "Programming",
+    id: "qz-truefalse",
+    topic: "Umum",
     type: "quiz",
-    title: "Kode & Syntax",
-    description: "Quiz konsep programming dan syntax",
-    template: `Buatkan 8 soal quiz tentang [TOPIC] untuk level [LEVEL].
-Campurkan soal konseptual dan soal tentang output kode.
+    title: "Benar / Salah",
+    description: "Quiz pernyataan benar atau salah",
+    template: `Buatkan 10 soal benar/salah tentang [TOPIC] untuk level [LEVEL]. Gunakan bahasa [LANGUAGE].
+[CUSTOM_NOTE]
 
-PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode (\`\`\`). Langsung mulai dengan [ dan akhiri dengan ].
+PENTING: Balas HANYA dengan array JSON murni. Langsung mulai dengan [ dan akhiri dengan ].
 
-Format JSON yang WAJIB digunakan (contoh):
+Format JSON:
 [
   {
-    "question": "Apa output dari: console.log(typeof null)?",
-    "options": [
-      "object",
-      "null",
-      "undefined",
-      "string"
-    ],
-    "answer": "object"
+    "question": "Matahari berputar mengelilingi Bumi.",
+    "options": ["Benar", "Salah"],
+    "answer": "Salah"
   }
 ]
 
-ATURAN WAJIB:
-1. Field "question": string berisi pertanyaan atau snippet kode
-2. Field "options": array berisi TEPAT 4 string jawaban (teks lengkap, bukan huruf)
-3. Field "answer": string IDENTIK SAMA PERSIS dengan salah satu elemen di "options"
-4. JANGAN tulis "A", "B", "C", "D" sebagai nilai "answer"
-5. Tidak ada field lain selain "question", "options", "answer"
-6. Topik: [TOPIC]`,
+ATURAN: "options" harus ["Benar","Salah"]. "answer" identik salah satu opsi. Topik: [TOPIC]`,
   },
   {
     id: "qz-math",
@@ -170,41 +177,65 @@ ATURAN WAJIB:
     type: "quiz",
     title: "Soal & Pemecahan",
     description: "Quiz pemecahan soal matematika",
-    template: `Buatkan 8 soal matematika tentang [TOPIC] untuk level [LEVEL].
+    template: `Buatkan 8 soal matematika tentang [TOPIC] untuk level [LEVEL]. Gunakan bahasa [LANGUAGE].
 Mulai dari soal mudah dan tingkatkan kesulitannya secara bertahap.
+[CUSTOM_NOTE]
 
-PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode (\`\`\`). Langsung mulai dengan [ dan akhiri dengan ].
+PENTING: Balas HANYA dengan array JSON murni. Langsung mulai dengan [ dan akhiri dengan ].
 
-Format JSON yang WAJIB digunakan (contoh):
+Format JSON:
 [
   {
     "question": "Berapakah hasil dari 15 × 12?",
-    "options": [
-      "180",
-      "170",
-      "175",
-      "165"
-    ],
+    "options": ["180", "170", "175", "165"],
     "answer": "180"
   }
 ]
 
-ATURAN WAJIB:
-1. Field "question": string berisi soal matematika
-2. Field "options": array berisi TEPAT 4 string (angka/ekspresi sebagai teks)
-3. Field "answer": string IDENTIK SAMA PERSIS dengan salah satu elemen di "options"
-4. JANGAN tulis "A", "B", "C", "D" sebagai nilai "answer"
-5. Tidak ada field lain selain "question", "options", "answer"
-6. Topik: [TOPIC]`,
+ATURAN: "options" TEPAT 4 string. "answer" identik salah satu opsi. Topik: [TOPIC]`,
+  },
+  {
+    id: "qz-reading",
+    topic: "Bahasa",
+    type: "quiz",
+    title: "Pemahaman Bacaan",
+    description: "Quiz soal pemahaman teks",
+    template: `Buatkan 8 soal pemahaman bacaan tentang [TOPIC] untuk level [LEVEL]. Gunakan bahasa [LANGUAGE].
+[CUSTOM_NOTE]
+
+PENTING: Balas HANYA dengan array JSON murni. Langsung mulai dengan [ dan akhiri dengan ].
+
+Format JSON:
+[
+  {
+    "question": "Apa tujuan utama dari fotosintesis?",
+    "options": [
+      "Menghasilkan oksigen untuk respirasi",
+      "Mengubah energi cahaya menjadi energi kimia berupa glukosa",
+      "Menyerap air dari tanah",
+      "Menghasilkan karbon dioksida"
+    ],
+    "answer": "Mengubah energi cahaya menjadi energi kimia berupa glukosa"
+  }
+]
+
+ATURAN: "options" TEPAT 4 string. "answer" identik salah satu opsi. Topik: [TOPIC]`,
   },
 ];
 
 export function generatePrompt(
   template: string,
   topic: string,
-  level: string
+  level: string,
+  language: string = "Bahasa Indonesia",
+  customNote: string = ""
 ): string {
+  const noteSection = customNote.trim()
+    ? `Catatan tambahan dari pengguna: ${customNote.trim()}`
+    : "";
   return template
     .replace(/\[TOPIC\]/g, topic)
-    .replace(/\[LEVEL\]/g, level);
+    .replace(/\[LEVEL\]/g, level)
+    .replace(/\[LANGUAGE\]/g, language)
+    .replace(/\[CUSTOM_NOTE\]/g, noteSection);
 }

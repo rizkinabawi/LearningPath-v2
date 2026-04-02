@@ -17,8 +17,10 @@ import {
   saveProgress,
   updateStats,
   getStats,
+  getLessons,
   generateId,
   type Flashcard,
+  type Lesson,
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -33,6 +35,7 @@ export default function FlashcardScreen() {
   const [flipped, setFlipped] = useState(false);
   const [completed, setCompleted] = useState<Record<string, "correct" | "wrong">>({});
   const [done, setDone] = useState(false);
+  const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
 
   const [flipAnim] = useState(new Animated.Value(0));
 
@@ -40,6 +43,11 @@ export default function FlashcardScreen() {
     (async () => {
       const data = await getFlashcards(lessonId);
       setCards(data);
+      const lessons = await getLessons();
+      const idx = lessons.findIndex((l) => l.id === lessonId);
+      if (idx !== -1 && idx + 1 < lessons.length) {
+        setNextLesson(lessons[idx + 1]);
+      }
     })();
   }, [lessonId]);
 
@@ -143,6 +151,15 @@ export default function FlashcardScreen() {
             <Text style={styles.doneBtnText}>Selesai</Text>
           </TouchableOpacity>
         </View>
+        {nextLesson && (
+          <TouchableOpacity
+            style={styles.nextLessonBtn}
+            onPress={() => router.replace(`/flashcard/${nextLesson.id}`)}
+          >
+            <Text style={styles.nextLessonBtnText}>Lanjut: {nextLesson.name}</Text>
+            <Text style={styles.nextLessonArrow}>→</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -430,4 +447,20 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   doneBtnText: { color: Colors.black, fontWeight: "800", fontSize: 15 },
+  nextLessonBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    width: "100%",
+    marginTop: 4,
+  },
+  nextLessonBtnText: { color: Colors.primary, fontWeight: "800", fontSize: 14, flex: 1 },
+  nextLessonArrow: { color: Colors.primary, fontWeight: "900", fontSize: 18 },
 });

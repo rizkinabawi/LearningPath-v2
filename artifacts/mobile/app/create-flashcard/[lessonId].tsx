@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Platform,
   Image,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,7 +23,8 @@ import * as Clipboard from "expo-clipboard";
 import { Button } from "@/components/Button";
 import {
   getFlashcards, saveFlashcard, deleteFlashcard,
-  generateId, getLessons, type Flashcard,
+  getFlashcardPacks, saveFlashcardPack, deleteFlashcardPack,
+  generateId, getLessons, type Flashcard, type FlashcardPack,
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
@@ -91,6 +93,13 @@ export default function CreateFlashcardScreen() {
   const [showImport, setShowImport] = useState(false);
   const [importJson, setImportJson] = useState("");
 
+  // Pack state
+  const [packs, setPacks] = useState<FlashcardPack[]>([]);
+  const [activePack, setActivePack] = useState<FlashcardPack | null>(null);
+  const [showPackModal, setShowPackModal] = useState(false);
+  const [newPackName, setNewPackName] = useState("");
+  const [pendingImportItems, setPendingImportItems] = useState<any[]>([]);
+
   // AI Prompt Builder state
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptTopic, setPromptTopic] = useState("");
@@ -103,6 +112,8 @@ export default function CreateFlashcardScreen() {
     (async () => {
       const data = await getFlashcards(lessonId);
       setExisting(data);
+      const packData = await getFlashcardPacks(lessonId);
+      setPacks(packData);
       if (lessonId) {
         const lessons = await getLessons();
         const lesson = lessons.find((l) => l.id === lessonId);
@@ -171,7 +182,6 @@ export default function CreateFlashcardScreen() {
 
   const handleImportJson = async () => {
     try {
-      // Strip markdown code fences that AI tools often add (```json ... ```)
       const cleaned = importJson
         .trim()
         .replace(/^```(?:json)?\s*/i, "")
@@ -179,7 +189,6 @@ export default function CreateFlashcardScreen() {
         .trim();
       const parsed = JSON.parse(cleaned);
 
-      // Normalisasi: terima flat array ATAU wrapped {type, items}
       let rawItems: any[] = [];
       if (Array.isArray(parsed)) {
         rawItems = parsed;
@@ -189,43 +198,78 @@ export default function CreateFlashcardScreen() {
         rawItems = [parsed];
       }
 
-      let count = 0;
-      for (const item of rawItems) {
-        // Format standar: question/answer/tag
-        // Backward compat: terima front/back jika ada (JSON lama)
-        const question = item.question ?? item.front ?? "";
-        const answer = item.answer ?? item.back ?? "";
-        const tag = item.tag ?? "";
+      const validItems = rawItems.filter(
+        (item) => (item.question ?? item.front) && (item.answer ?? item.back)
+      );
 
-        if (question && answer) {
-          const card: Flashcard = {
-            id: generateId(),
-            lessonId: lessonId ?? "",
-            question: String(question),
-            answer: String(answer),
-            tag: String(tag),
-            createdAt: new Date().toISOString(),
-          };
-          await saveFlashcard(card);
-          setExisting((prev) => [...prev, card]);
-          count++;
-        }
-      }
-
-      if (count === 0) {
-        Alert.alert("Tidak Ada Data", "Tidak ada item yang valid ditemukan. Pastikan setiap item memiliki field question/answer.");
+      if (validItems.length === 0) {
+        Alert.alert("Tidak Ada Data", "Tidak ada item yang valid ditemukan.");
         return;
       }
 
-      setImportJson("");
-      setShowImport(false);
-      toast.success(`${count} flashcard berhasil diimport!`);
+      setPendingImportItems(validItems);
+      setShowPackModal(true);
     } catch {
       Alert.alert(
         "JSON Tidak Valid",
         'Format yang didukung:\n\n1. Flat array (disarankan):\n[{"question":"...","answer":"...","tag":"..."}]\n\n2. Wrapped format:\n{"items":[{"question":"...","answer":"..."}]}'
       );
     }
+  };
+
+  const doImportToPack = async (packId: string) => {
+    let count = 0;
+    for (const item of pendingImportItems) {
+      const question = item.question ?? item.front ?? "";
+      const answer = item.answer ?? item.back ?? "";
+      const tag = item.tag ?? "";
+      const card: Flashcard = {
+        id: generateId(),
+        lessonId: lessonId ?? "",
+        packId,
+        question: String(question),
+        answer: String(answer),
+        tag: String(tag),
+        createdAt: new Date().toISOString(),
+      };
+      await saveFlashcard(card);
+      setExisting((prev) => [...prev, card]);
+      count++;
+    }
+    setPendingImportItems([]);
+    setImportJson("");
+    setShowImport(false);
+    setShowPackModal(false);
+    setNewPackName("");
+    toast.success(`${count} flashcard berhasil diimport!`);
+  };
+
+  const handleCreatePackAndImport = async () => {
+    const name = newPackName.trim();
+    if (!name) { Alert.alert("Nama Pack", "Masukkan nama pack flashcard."); return; }
+    const pack: FlashcardPack = {
+      id: generateId(),
+      lessonId: lessonId ?? "",
+      name,
+      createdAt: new Date().toISOString(),
+    };
+    await saveFlashcardPack(pack);
+    setPacks((prev) => [...prev, pack]);
+    await doImportToPack(pack.id);
+  };
+
+  const handleDeletePack = async (packId: string) => {
+    Alert.alert("Hapus Pack", "Hapus pack ini? Semua flashcard di dalamnya tetap ada tapi tidak berpack.", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus", style: "destructive", onPress: async () => {
+          await deleteFlashcardPack(packId);
+          setPacks((prev) => prev.filter((p) => p.id !== packId));
+          if (activePack?.id === packId) setActivePack(null);
+          toast.info("Pack dihapus");
+        },
+      },
+    ]);
   };
 
   const handleGenerateAndCopyPrompt = async () => {
@@ -269,6 +313,85 @@ export default function CreateFlashcardScreen() {
         </TouchableOpacity>
       </View>
       <Text style={styles.count}>{existing.length} kartu di pelajaran ini</Text>
+
+      {/* ── FLASHCARD PACKS ── */}
+      {packs.length > 0 && (
+        <View style={styles.packsSection}>
+          <Text style={styles.packsSectionTitle}>Pack Flashcard</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
+            <TouchableOpacity
+              style={[styles.packChip, !activePack && styles.packChipActive]}
+              onPress={() => setActivePack(null)}
+            >
+              <Text style={[styles.packChipText, !activePack && styles.packChipTextActive]}>
+                Semua ({existing.length})
+              </Text>
+            </TouchableOpacity>
+            {packs.map((p) => {
+              const cnt = existing.filter((c) => c.packId === p.id).length;
+              const isActive = activePack?.id === p.id;
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.packChip, isActive && styles.packChipActive]}
+                  onPress={() => setActivePack(isActive ? null : p)}
+                  onLongPress={() => handleDeletePack(p.id)}
+                >
+                  <Text style={[styles.packChipText, isActive && styles.packChipTextActive]}>
+                    {p.name} ({cnt})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── PACK SELECTION MODAL ── */}
+      {showPackModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Simpan ke Pack</Text>
+            <Text style={styles.modalSub}>{pendingImportItems.length} flashcard akan diimport</Text>
+
+            {packs.length > 0 && (
+              <>
+                <Text style={styles.modalLabel}>Tambah ke pack yang ada:</Text>
+                {packs.map((p) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={styles.modalPackRow}
+                    onPress={() => doImportToPack(p.id)}
+                  >
+                    <Text style={styles.modalPackName}>{p.name}</Text>
+                    <Text style={styles.modalPackCount}>
+                      {existing.filter((c) => c.packId === p.id).length} kartu
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <View style={styles.modalDivider} />
+              </>
+            )}
+
+            <Text style={styles.modalLabel}>Buat pack baru:</Text>
+            <TextInput
+              value={newPackName}
+              onChangeText={setNewPackName}
+              placeholder="Nama pack (contoh: Bab 1, Set Latihan)"
+              style={styles.modalInput}
+              placeholderTextColor={Colors.textMuted}
+              autoFocus
+            />
+            <TouchableOpacity style={styles.modalCreateBtn} onPress={handleCreatePackAndImport}>
+              <Text style={styles.modalCreateBtnText}>Buat Pack & Import</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowPackModal(false); setPendingImportItems([]); }}>
+              <Text style={styles.modalCancelText}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* ── AI PROMPT BUILDER ── */}
       <View style={styles.aiCard}>
@@ -710,4 +833,55 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dangerLight,
     alignItems: "center", justifyContent: "center",
   },
+
+  // Packs
+  packsSection: { marginBottom: 12 },
+  packsSectionTitle: {
+    fontSize: 11, fontWeight: "800", color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 1, marginBottom: 8,
+  },
+  packChip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.white,
+  },
+  packChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  packChipText: { fontSize: 13, fontWeight: "700", color: Colors.textMuted },
+  packChipTextActive: { color: Colors.white },
+
+  // Modal
+  modalOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center",
+    zIndex: 100, paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: Colors.white, borderRadius: 20, padding: 20, width: "100%", gap: 10,
+  },
+  modalTitle: { fontSize: 17, fontWeight: "900", color: Colors.dark },
+  modalSub: { fontSize: 13, color: Colors.textMuted, fontWeight: "500", marginBottom: 4 },
+  modalLabel: {
+    fontSize: 11, fontWeight: "800", color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 1,
+  },
+  modalPackRow: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12,
+    backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border,
+  },
+  modalPackName: { fontSize: 14, fontWeight: "700", color: Colors.dark },
+  modalPackCount: { fontSize: 12, color: Colors.textMuted, fontWeight: "600" },
+  modalDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 4 },
+  modalInput: {
+    backgroundColor: Colors.background, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 14, fontWeight: "600", color: Colors.dark,
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
+  modalCreateBtn: {
+    backgroundColor: Colors.primary, borderRadius: 12,
+    paddingVertical: 13, alignItems: "center",
+  },
+  modalCreateBtnText: { fontSize: 14, fontWeight: "900", color: Colors.white },
+  modalCancelBtn: { alignItems: "center", paddingVertical: 8 },
+  modalCancelText: { fontSize: 14, fontWeight: "700", color: Colors.textMuted },
 });

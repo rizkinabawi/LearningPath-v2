@@ -17,8 +17,10 @@ import {
   saveProgress,
   updateStats,
   getStats,
+  getLessons,
   generateId,
   type Quiz,
+  type Lesson,
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -34,11 +36,17 @@ export default function QuizScreen() {
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
+  const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
 
   useEffect(() => {
     (async () => {
       const data = await getQuizzes(lessonId);
       setQuizzes(data);
+      const lessons = await getLessons();
+      const idx = lessons.findIndex((l) => l.id === lessonId);
+      if (idx !== -1 && idx + 1 < lessons.length) {
+        setNextLesson(lessons[idx + 1]);
+      }
     })();
   }, [lessonId]);
 
@@ -140,6 +148,15 @@ export default function QuizScreen() {
             <Text style={styles.doneBtnText}>Selesai</Text>
           </TouchableOpacity>
         </View>
+        {nextLesson && (
+          <TouchableOpacity
+            style={styles.nextLessonBtn}
+            onPress={() => router.replace(`/quiz/${nextLesson.id}`)}
+          >
+            <Text style={styles.nextLessonBtnText}>Lanjut: {nextLesson.name}</Text>
+            <Text style={styles.nextLessonArrow}>→</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -418,4 +435,13 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   doneBtnText: { color: Colors.black, fontWeight: "800", fontSize: 15 },
+  nextLessonBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, backgroundColor: Colors.primaryLight,
+    borderWidth: 1.5, borderColor: Colors.primary,
+    borderRadius: 18, paddingVertical: 14, paddingHorizontal: 20,
+    width: "100%", marginTop: 4,
+  },
+  nextLessonBtnText: { color: Colors.primary, fontWeight: "800", fontSize: 14, flex: 1 },
+  nextLessonArrow: { color: Colors.primary, fontWeight: "900", fontSize: 18 },
 });

@@ -11,6 +11,7 @@ import {
   ScrollView,
   Linking,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,10 +29,14 @@ import {
   ExternalLink,
   BookOpen,
   Clock,
+  Youtube,
+  FileImage,
+  Globe,
 } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
+import * as ImagePicker from "expo-image-picker";
 import {
   getStudyMaterials,
   saveStudyMaterial,
@@ -67,7 +72,7 @@ const formatDate = (iso: string) => {
   });
 };
 
-type TabType = "text" | "html" | "file";
+type TabType = "text" | "html" | "file" | "youtube" | "googledoc" | "image";
 
 const TYPE_INFO: Record<TabType, { icon: React.ReactNode; label: string; color: string; bg: string }> = {
   text: {
@@ -87,6 +92,24 @@ const TYPE_INFO: Record<TabType, { icon: React.ReactNode; label: string; color: 
     label: "File",
     color: Colors.amber,
     bg: Colors.amberLight,
+  },
+  youtube: {
+    icon: <Youtube size={14} color="#FF0000" />,
+    label: "YouTube",
+    color: "#FF0000",
+    bg: "#FFF0F0",
+  },
+  googledoc: {
+    icon: <Globe size={14} color="#1967D2" />,
+    label: "Google Docs",
+    color: "#1967D2",
+    bg: "#E8F0FE",
+  },
+  image: {
+    icon: <FileImage size={14} color={Colors.success} />,
+    label: "Gambar",
+    color: Colors.success,
+    bg: Colors.successLight,
   },
 };
 
@@ -108,6 +131,7 @@ export default function StudyMaterialScreen() {
   const [pickedFile, setPickedFile] = useState<{
     name: string; uri: string; size?: number; mimeType?: string;
   } | null>(null);
+  const [pickedImage, setPickedImage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const safeLesson = Array.isArray(lessonId) ? lessonId[0] : (lessonId ?? "");
@@ -131,8 +155,24 @@ export default function StudyMaterialScreen() {
     setMatTitle("");
     setMatContent("");
     setPickedFile(null);
+    setPickedImage(null);
     setActiveTab("text");
     setShowModal(true);
+  };
+
+  const pickMaterialImage = async () => {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") { Alert.alert("Izin", "Izinkan akses galeri."); return; }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setPickedImage(result.assets[0].uri);
+    }
   };
 
   const pickFile = async () => {
@@ -155,18 +195,16 @@ export default function StudyMaterialScreen() {
   };
 
   const handleSave = async () => {
-    if (!matTitle.trim()) {
-      toast.error("Judul materi tidak boleh kosong");
-      return;
-    }
-    if (activeTab !== "file" && !matContent.trim()) {
-      toast.error("Isi konten materi");
-      return;
-    }
-    if (activeTab === "file" && !pickedFile) {
-      toast.error("Pilih file terlebih dahulu");
-      return;
-    }
+    if (!matTitle.trim()) { toast.error("Judul materi tidak boleh kosong"); return; }
+
+    const urlTypes = ["youtube", "googledoc"] as const;
+    const isUrlType = urlTypes.includes(activeTab as any);
+
+    if (isUrlType && !matContent.trim()) { toast.error("Masukkan URL"); return; }
+    if (activeTab === "text" && !matContent.trim()) { toast.error("Isi konten materi"); return; }
+    if (activeTab === "html" && !matContent.trim()) { toast.error("Isi konten HTML"); return; }
+    if (activeTab === "file" && !pickedFile) { toast.error("Pilih file terlebih dahulu"); return; }
+    if (activeTab === "image" && !pickedImage) { toast.error("Pilih gambar terlebih dahulu"); return; }
 
     const safeId = Array.isArray(lessonId) ? lessonId[0] : (lessonId ?? "");
 
@@ -181,22 +219,28 @@ export default function StudyMaterialScreen() {
         fileName = pickedFile.name;
         fileSize = pickedFile.size;
         fileMime = pickedFile.mimeType;
-
         if (Platform.OS !== "web") {
           try {
             await ensureDir();
             const ext = pickedFile.name.split(".").pop() ?? "bin";
-            const destName = `${generateId()}.${ext}`;
-            const dest = MATERIAL_DIR + destName;
+            const dest = MATERIAL_DIR + `${generateId()}.${ext}`;
             await FileSystem.copyAsync({ from: pickedFile.uri, to: dest });
             filePath = dest;
-          } catch {
-            // Fall back to original picker URI (still accessible from cache)
-            filePath = pickedFile.uri;
-          }
-        } else {
-          filePath = pickedFile.uri;
-        }
+          } catch { filePath = pickedFile.uri; }
+        } else { filePath = pickedFile.uri; }
+      }
+
+      if (activeTab === "image" && pickedImage) {
+        if (Platform.OS !== "web") {
+          try {
+            await ensureDir();
+            const ext = pickedImage.split(".").pop()?.split("?")[0] ?? "jpg";
+            const dest = MATERIAL_DIR + `${generateId()}.${ext}`;
+            await FileSystem.copyAsync({ from: pickedImage, to: dest });
+            filePath = dest;
+          } catch { filePath = pickedImage; }
+        } else { filePath = pickedImage; }
+        fileMime = "image/*";
       }
 
       const mat: StudyMaterial = {
@@ -204,7 +248,7 @@ export default function StudyMaterialScreen() {
         lessonId: safeId,
         title: matTitle.trim(),
         type: activeTab,
-        content: activeTab === "file" ? "" : matContent.trim(),
+        content: (activeTab === "file" || activeTab === "image") ? "" : matContent.trim(),
         filePath,
         fileName,
         fileSize,
@@ -213,6 +257,7 @@ export default function StudyMaterialScreen() {
       };
       await saveStudyMaterial(mat);
       setShowModal(false);
+      setPickedImage(null);
       toast.success("Materi berhasil disimpan!");
       loadData();
     } catch (e: any) {
@@ -288,7 +333,10 @@ export default function StudyMaterialScreen() {
   const TABS: { key: TabType; label: string }[] = [
     { key: "text", label: "Teks" },
     { key: "html", label: "HTML" },
-    { key: "file", label: "Upload File" },
+    { key: "youtube", label: "YouTube" },
+    { key: "googledoc", label: "Docs" },
+    { key: "image", label: "Gambar" },
+    { key: "file", label: "File" },
   ];
 
   return (
@@ -432,6 +480,54 @@ export default function StudyMaterialScreen() {
                         </TouchableOpacity>
                       </View>
                     )}
+
+                    {mat.type === "youtube" && (
+                      <View style={styles.linkBox}>
+                        <View style={styles.linkIconWrap}>
+                          <Youtube size={24} color="#FF0000" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.linkLabel}>YouTube Video</Text>
+                          <Text style={styles.linkUrl} numberOfLines={2}>{mat.content}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.openLinkBtn, { backgroundColor: "#FF0000" }]}
+                          onPress={() => Linking.openURL(mat.content).catch(() => toast.error("Tidak bisa buka URL"))}
+                        >
+                          <ExternalLink size={14} color="#fff" />
+                          <Text style={styles.openLinkBtnText}>Buka</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {mat.type === "googledoc" && (
+                      <View style={styles.linkBox}>
+                        <View style={[styles.linkIconWrap, { backgroundColor: "#E8F0FE" }]}>
+                          <Globe size={24} color="#1967D2" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.linkLabel, { color: "#1967D2" }]}>Google Docs</Text>
+                          <Text style={styles.linkUrl} numberOfLines={2}>{mat.content}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.openLinkBtn, { backgroundColor: "#1967D2" }]}
+                          onPress={() => Linking.openURL(mat.content).catch(() => toast.error("Tidak bisa buka URL"))}
+                        >
+                          <ExternalLink size={14} color="#fff" />
+                          <Text style={styles.openLinkBtnText}>Buka</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {mat.type === "image" && mat.filePath && (
+                      <View style={styles.imageBox}>
+                        <Image
+                          source={{ uri: mat.filePath }}
+                          style={styles.materialImage}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
@@ -463,7 +559,7 @@ export default function StudyMaterialScreen() {
               contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
             >
               {/* Type Tabs */}
-              <View style={styles.tabRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabRow, { paddingRight: 4 }]}>
                 {TABS.map((t) => (
                   <TouchableOpacity
                     key={t.key}
@@ -475,6 +571,7 @@ export default function StudyMaterialScreen() {
                       setActiveTab(t.key);
                       setMatContent("");
                       setPickedFile(null);
+                      setPickedImage(null);
                     }}
                   >
                     <Text
@@ -487,7 +584,7 @@ export default function StudyMaterialScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
 
               <Text style={styles.fieldLabel}>Judul Materi</Text>
               <TextInput
@@ -567,6 +664,65 @@ export default function StudyMaterialScreen() {
                       <Paperclip size={20} color={Colors.amber} />
                       <Text style={styles.uploadBtnText}>Pilih File</Text>
                       <Text style={styles.uploadBtnHint}>PPT, PDF, DOC, DOCX, dll</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+
+              {activeTab === "youtube" && (
+                <>
+                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>URL YouTube</Text>
+                  <Text style={styles.fieldHint}>Paste link video YouTube</Text>
+                  <TextInput
+                    value={matContent}
+                    onChangeText={setMatContent}
+                    placeholder="https://youtube.com/watch?v=..."
+                    style={styles.input}
+                    placeholderTextColor={Colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                </>
+              )}
+
+              {activeTab === "googledoc" && (
+                <>
+                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>URL Google Docs / Slides / Sheets</Text>
+                  <Text style={styles.fieldHint}>Pastikan link publik/dapat dibagikan</Text>
+                  <TextInput
+                    value={matContent}
+                    onChangeText={setMatContent}
+                    placeholder="https://docs.google.com/..."
+                    style={styles.input}
+                    placeholderTextColor={Colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                </>
+              )}
+
+              {activeTab === "image" && (
+                <>
+                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>Gambar</Text>
+                  {pickedImage ? (
+                    <View style={styles.pickedImageWrap}>
+                      <Image source={{ uri: pickedImage }} style={styles.pickedImagePreview} resizeMode="cover" />
+                      <TouchableOpacity onPress={() => setPickedImage(null)} style={styles.removeImageBtn}>
+                        <X size={14} color={Colors.danger} />
+                        <Text style={styles.removeImageText}>Ganti Gambar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.uploadBtn, { borderColor: Colors.success }]}
+                      onPress={pickMaterialImage}
+                      activeOpacity={0.8}
+                    >
+                      <FileImage size={20} color={Colors.success} />
+                      <Text style={[styles.uploadBtnText, { color: Colors.success }]}>Pilih Gambar</Text>
+                      <Text style={styles.uploadBtnHint}>JPG, PNG, WebP</Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -698,7 +854,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: "900", color: Colors.dark, marginBottom: 4 },
   tabRow: { flexDirection: "row", gap: 6, marginBottom: 4 },
   tabBtn: {
-    flex: 1, paddingVertical: 9, borderRadius: 10,
+    paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10,
     backgroundColor: Colors.background, borderWidth: 1.5, borderColor: Colors.border,
     alignItems: "center",
   },
@@ -748,4 +904,36 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, alignItems: "center",
   },
   saveBtnText: { fontSize: 14, fontWeight: "900", color: Colors.white },
+
+  // YouTube / Google Docs link display
+  linkBox: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: Colors.white, borderRadius: 12, padding: 12,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  linkIconWrap: {
+    width: 44, height: 44, borderRadius: 10,
+    backgroundColor: "#FFF0F0", alignItems: "center", justifyContent: "center",
+  },
+  linkLabel: { fontSize: 12, fontWeight: "800", color: "#FF0000", marginBottom: 2 },
+  linkUrl: { fontSize: 11, color: Colors.textMuted, fontWeight: "500" },
+  openLinkBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
+  },
+  openLinkBtnText: { fontSize: 11, fontWeight: "800", color: "#fff" },
+
+  // Image display
+  imageBox: { borderRadius: 12, overflow: "hidden" },
+  materialImage: { width: "100%", height: 200, borderRadius: 12 },
+
+  // Picked image in modal
+  pickedImageWrap: { gap: 8, marginTop: 6 },
+  pickedImagePreview: { width: "100%", height: 160, borderRadius: 12 },
+  removeImageBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    alignSelf: "center",
+  },
+  removeImageText: { fontSize: 12, color: Colors.danger, fontWeight: "700" },
+
 });

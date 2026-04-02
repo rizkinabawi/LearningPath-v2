@@ -1,13 +1,17 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, Platform, Share,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import {
   getUser, getStats, getLearningPaths, clearAllData,
+  exportCourse, importCourse,
   type User as UserType, type Stats,
 } from "@/utils/storage";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
@@ -18,6 +22,7 @@ export default function ProfileTab() {
   const [user, setUser] = useState<UserType | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [pathCount, setPathCount] = useState(0);
+  const [importing, setImporting] = useState(false);
 
   useFocusEffect(useCallback(() => {
     (async () => {
@@ -26,15 +31,70 @@ export default function ProfileTab() {
     })();
   }, []));
 
+  const handleExportCourse = async () => {
+    try {
+      const pack = await exportCourse();
+      const json = JSON.stringify(pack, null, 2);
+      if (Platform.OS === "web") {
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `course-pack-${Date.now()}.json`; a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const fileUri = FileSystem.cacheDirectory + `course-pack-${Date.now()}.json`;
+        await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+        await Share.share({ url: fileUri, message: "Course Pack dari Mobile Learning" });
+      }
+    } catch (e) {
+      Alert.alert("Export Gagal", "Terjadi kesalahan saat mengekspor kursus.");
+    }
+  };
+
+  const handleImportCourse = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: "application/json", copyToCacheDirectory: true });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      setImporting(true);
+      const text = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+      const pack = JSON.parse(text);
+      if (!pack.version || !pack.paths) {
+        Alert.alert("Format Tidak Valid", "File bukan course pack yang valid.");
+        setImporting(false); return;
+      }
+      const count = await importCourse(pack);
+      const paths = await getLearningPaths();
+      setPathCount(paths.length);
+      Alert.alert("Import Berhasil", `${count} item berhasil diimport!`);
+    } catch {
+      Alert.alert("Import Gagal", "Gagal membaca file. Pastikan format file benar.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const accuracy = stats && stats.totalAnswers > 0
     ? Math.round((stats.correctAnswers / stats.totalAnswers) * 100) : 0;
   const wrong = (stats?.totalAnswers ?? 0) - (stats?.correctAnswers ?? 0);
 
   const MENU = [
     {
+      icon: "download" as const, label: "Export Kursus",
+      sub: "Simpan semua kursus ke file JSON",
+      color: Colors.teal,
+      onPress: handleExportCourse,
+    },
+    {
+      icon: "upload" as const, label: "Import Kursus",
+      sub: "Muat kursus dari file JSON",
+      color: Colors.primary,
+      onPress: handleImportCourse,
+    },
+    {
       icon: "share-2" as const, label: "Bagikan Progress",
       sub: "Ceritakan pencapaianmu",
-      color: Colors.primary,
+      color: Colors.amber,
       onPress: async () => Share.share({ message: `Akurasi saya ${accuracy}% dengan ${stats?.totalAnswers ?? 0} jawaban di Mobile Learning! 🎓` }),
     },
     {
@@ -174,6 +234,12 @@ export default function ProfileTab() {
 
         {/* Settings menu */}
         <Text style={styles.menuLabel}>Pengaturan</Text>
+        {importing && (
+          <View style={styles.importingBanner}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.importingText}>Mengimport kursus...</Text>
+          </View>
+        )}
         <View style={[styles.menuCard, shadowSm]}>
           {MENU.map((item, i) => (
             <React.Fragment key={item.label}>
@@ -243,4 +309,10 @@ const styles = StyleSheet.create({
   menuSub: { fontSize: 11, color: Colors.textMuted, fontWeight: "500", marginTop: 2 },
   menuDivider: { height: 1, backgroundColor: Colors.borderLight, marginHorizontal: 16 },
   footer: { textAlign: "center", fontSize: 11, color: Colors.textMuted, fontWeight: "600", paddingTop: 8, paddingBottom: 12 },
+  importingBanner: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: Colors.primaryLight, borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  importingText: { fontSize: 14, fontWeight: "700", color: Colors.primary },
 });

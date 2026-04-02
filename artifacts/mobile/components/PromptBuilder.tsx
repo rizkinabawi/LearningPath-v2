@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
 import { Feather } from "@expo/vector-icons";
-import { generatePrompt, PROMPT_TEMPLATES, PromptTemplate } from "@/utils/prompt-templates";
+import { generatePrompt, PROMPT_TEMPLATES, LANGUAGE_OPTIONS, PromptTemplate } from "@/utils/prompt-templates";
 import { shareJson, copyJsonToClipboard, type LearningJsonOutput } from "@/utils/json-export";
 import { exportAsZip } from "@/utils/zip-handler";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
@@ -110,6 +110,8 @@ export const PromptBuilder = () => {
   const [activeTab, setActiveTab] = useState<Tab>("builder");
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState("intermediate");
+  const [language, setLanguage] = useState("Bahasa Indonesia");
+  const [customNote, setCustomNote] = useState("");
   const [outputType, setOutputType] = useState<"quiz" | "flashcard">("flashcard");
   const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplate | null>(null);
   const [generatedPrompt, setGeneratedPrompt] = useState("");
@@ -136,7 +138,7 @@ export const PromptBuilder = () => {
     await new Promise((r) => setTimeout(r, 400));
 
     const levelLabel = diffOption.label;
-    const prompt = generatePrompt(selectedTemplate.template, topic.trim(), levelLabel);
+    const prompt = generatePrompt(selectedTemplate.template, topic.trim(), levelLabel, language, customNote);
     setGeneratedPrompt(prompt);
 
     const sampleData: LearningJsonOutput =
@@ -393,6 +395,36 @@ export const PromptBuilder = () => {
                 />
               ))}
             </View>
+          </View>
+
+          {/* Language */}
+          <View style={styles.section}>
+            <SectionLabel text="Bahasa Soal" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
+              {LANGUAGE_OPTIONS.map((l) => (
+                <Chip
+                  key={l.id}
+                  label={l.label}
+                  active={language === l.id}
+                  color={Colors.primary}
+                  bg={Colors.primaryLight}
+                  onPress={() => setLanguage(l.id)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Custom Note */}
+          <View style={styles.section}>
+            <SectionLabel text="Catatan Khusus (Opsional)" />
+            <TextInput
+              placeholder="Contoh: fokus pada bab 3, tambah konteks lokal Indonesia, buat soal bergaya UTBK..."
+              value={customNote}
+              onChangeText={setCustomNote}
+              style={[styles.input, { minHeight: 72, textAlignVertical: "top", paddingTop: 12 }]}
+              placeholderTextColor={Colors.textMuted}
+              multiline
+            />
           </View>
 
           {/* Templates */}

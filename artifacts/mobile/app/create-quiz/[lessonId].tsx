@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Platform,
   Image,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,9 +32,13 @@ import {
   getQuizzes,
   saveQuiz,
   deleteQuiz,
+  getQuizPacks,
+  saveQuizPack,
+  deleteQuizPack,
   generateId,
   getLessons,
   type Quiz,
+  type QuizPack,
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
@@ -108,6 +113,13 @@ export default function CreateQuizScreen() {
   const [showImport, setShowImport] = useState(false);
   const [importJson, setImportJson] = useState("");
 
+  // Pack state
+  const [packs, setPacks] = useState<QuizPack[]>([]);
+  const [activePack, setActivePack] = useState<QuizPack | null>(null);
+  const [showPackModal, setShowPackModal] = useState(false);
+  const [newPackName, setNewPackName] = useState("");
+  const [pendingImportItems, setPendingImportItems] = useState<any[]>([]);
+
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptTopic, setPromptTopic] = useState("");
   const [promptCount, setPromptCount] = useState("10");
@@ -119,6 +131,8 @@ export default function CreateQuizScreen() {
     (async () => {
       const data = await getQuizzes(lessonId);
       setExisting(data);
+      const packData = await getQuizPacks(lessonId);
+      setPacks(packData);
       if (lessonId) {
         const lessons = await getLessons();
         const lesson = lessons.find((l) => l.id === lessonId);
@@ -195,80 +209,100 @@ export default function CreateQuizScreen() {
     toast.info("Soal dihapus");
   };
 
+  const parseValidQuizItems = (rawItems: any[]) => {
+    return rawItems.filter((item) => item.question && Array.isArray(item.options) && item.answer);
+  };
+
   const handleImportJson = async () => {
     try {
-      // Strip markdown code fences that AI tools often add (```json ... ```)
-      const cleaned = importJson
-        .trim()
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
+      const cleaned = importJson.trim()
+        .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
       const parsed = JSON.parse(cleaned);
-
-      // Normalisasi: terima flat array ATAU wrapped {type, items}
       let rawItems: any[] = [];
-      if (Array.isArray(parsed)) {
-        rawItems = parsed;
-      } else if (parsed && Array.isArray(parsed.items)) {
-        rawItems = parsed.items;
-      } else {
-        rawItems = [parsed];
-      }
+      if (Array.isArray(parsed)) rawItems = parsed;
+      else if (parsed && Array.isArray(parsed.items)) rawItems = parsed.items;
+      else rawItems = [parsed];
 
-      let count = 0;
-      for (const item of rawItems) {
-        if (!item.question || !Array.isArray(item.options) || !item.answer) continue;
-
-        const options: string[] = item.options.map(String);
-        const answerRaw = String(item.answer).trim();
-
-        // Coba cocokkan jawaban: cari opsi yang mengandung jawaban atau sebaliknya
-        let answer = answerRaw;
-        const exactMatch = options.find((o) => o === answerRaw);
-        if (!exactMatch) {
-          // Fallback: cari opsi yang dimulai dengan huruf jawaban (misal: "A" → opsi pertama)
-          const letterMatch = answerRaw.match(/^([A-Da-d])[\.\):\s]/);
-          if (letterMatch) {
-            const idx = "abcd".indexOf(letterMatch[1].toLowerCase());
-            if (idx >= 0 && options[idx]) answer = options[idx];
-          } else {
-            // Partial match: cari opsi yang mengandung teks jawaban
-            const partial = options.find((o) =>
-              o.toLowerCase().includes(answerRaw.toLowerCase()) ||
-              answerRaw.toLowerCase().includes(o.toLowerCase())
-            );
-            if (partial) answer = partial;
-          }
-        }
-
-        const quiz: Quiz = {
-          id: generateId(),
-          lessonId: lessonId ?? "",
-          question: String(item.question),
-          options,
-          answer,
-          type: "multiple-choice",
-          createdAt: new Date().toISOString(),
-        };
-        await saveQuiz(quiz);
-        setExisting((prev) => [...prev, quiz]);
-        count++;
-      }
-
-      if (count === 0) {
-        Alert.alert("Tidak Ada Data", "Tidak ada soal valid. Pastikan setiap item punya field question, options (array), dan answer.");
+      const validItems = parseValidQuizItems(rawItems);
+      if (validItems.length === 0) {
+        Alert.alert("Tidak Ada Data", "Tidak ada soal valid.");
         return;
       }
-
-      setImportJson("");
-      setShowImport(false);
-      toast.success(`${count} soal berhasil diimport!`);
+      setPendingImportItems(validItems);
+      setShowPackModal(true);
     } catch {
-      Alert.alert(
-        "JSON Tidak Valid",
-        'Format yang didukung:\n\n1. Flat array (disarankan):\n[{"question":"...","options":["A","B","C","D"],"answer":"teks lengkap A"}]\n\n2. Wrapped format:\n{"items":[{"question":"...","options":[...],"answer":"..."}]}'
-      );
+      Alert.alert("JSON Tidak Valid", 'Format: [{"question":"...","options":[...],"answer":"..."}]');
     }
+  };
+
+  const doImportToPack = async (packId: string) => {
+    let count = 0;
+    for (const item of pendingImportItems) {
+      const options: string[] = item.options.map(String);
+      const answerRaw = String(item.answer).trim();
+      let answer = answerRaw;
+      const exactMatch = options.find((o) => o === answerRaw);
+      if (!exactMatch) {
+        const letterMatch = answerRaw.match(/^([A-Da-d])[\.\):\s]/);
+        if (letterMatch) {
+          const idx = "abcd".indexOf(letterMatch[1].toLowerCase());
+          if (idx >= 0 && options[idx]) answer = options[idx];
+        } else {
+          const partial = options.find((o) =>
+            o.toLowerCase().includes(answerRaw.toLowerCase()) ||
+            answerRaw.toLowerCase().includes(o.toLowerCase())
+          );
+          if (partial) answer = partial;
+        }
+      }
+      const quiz: Quiz = {
+        id: generateId(),
+        lessonId: lessonId ?? "",
+        packId,
+        question: String(item.question),
+        options,
+        answer,
+        type: "multiple-choice",
+        createdAt: new Date().toISOString(),
+      };
+      await saveQuiz(quiz);
+      setExisting((prev) => [...prev, quiz]);
+      count++;
+    }
+    setPendingImportItems([]);
+    setImportJson("");
+    setShowImport(false);
+    setShowPackModal(false);
+    setNewPackName("");
+    toast.success(`${count} soal berhasil diimport!`);
+  };
+
+  const handleCreatePackAndImport = async () => {
+    const name = newPackName.trim();
+    if (!name) { Alert.alert("Nama Pack", "Masukkan nama pack quiz."); return; }
+    const pack: QuizPack = {
+      id: generateId(),
+      lessonId: lessonId ?? "",
+      name,
+      createdAt: new Date().toISOString(),
+    };
+    await saveQuizPack(pack);
+    setPacks((prev) => [...prev, pack]);
+    await doImportToPack(pack.id);
+  };
+
+  const handleDeletePack = async (packId: string) => {
+    Alert.alert("Hapus Pack", "Hapus pack ini?", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus", style: "destructive", onPress: async () => {
+          await deleteQuizPack(packId);
+          setPacks((prev) => prev.filter((p) => p.id !== packId));
+          if (activePack?.id === packId) setActivePack(null);
+          toast.info("Pack dihapus");
+        },
+      },
+    ]);
   };
 
   const handleGenerateAndCopyPrompt = async () => {
@@ -312,6 +346,76 @@ export default function CreateQuizScreen() {
         </TouchableOpacity>
       </View>
       <Text style={styles.count}>{existing.length} soal di pelajaran ini</Text>
+
+      {/* ── QUIZ PACKS ── */}
+      {packs.length > 0 && (
+        <View style={styles.packsSection}>
+          <Text style={styles.packsSectionTitle}>Pack Quiz</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
+            <TouchableOpacity
+              style={[styles.packChip, !activePack && styles.packChipActive]}
+              onPress={() => setActivePack(null)}
+            >
+              <Text style={[styles.packChipText, !activePack && styles.packChipTextActive]}>
+                Semua ({existing.length})
+              </Text>
+            </TouchableOpacity>
+            {packs.map((p) => {
+              const cnt = existing.filter((q) => q.packId === p.id).length;
+              const isActive = activePack?.id === p.id;
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.packChip, isActive && styles.packChipActive]}
+                  onPress={() => setActivePack(isActive ? null : p)}
+                  onLongPress={() => handleDeletePack(p.id)}
+                >
+                  <Text style={[styles.packChipText, isActive && styles.packChipTextActive]}>
+                    {p.name} ({cnt})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── PACK SELECTION MODAL ── */}
+      {showPackModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Simpan ke Pack</Text>
+            <Text style={styles.modalSub}>{pendingImportItems.length} soal akan diimport</Text>
+            {packs.length > 0 && (
+              <>
+                <Text style={styles.modalLabel}>Tambah ke pack yang ada:</Text>
+                {packs.map((p) => (
+                  <TouchableOpacity key={p.id} style={styles.modalPackRow} onPress={() => doImportToPack(p.id)}>
+                    <Text style={styles.modalPackName}>{p.name}</Text>
+                    <Text style={styles.modalPackCount}>{existing.filter((q) => q.packId === p.id).length} soal</Text>
+                  </TouchableOpacity>
+                ))}
+                <View style={styles.modalDivider} />
+              </>
+            )}
+            <Text style={styles.modalLabel}>Buat pack baru:</Text>
+            <TextInput
+              value={newPackName}
+              onChangeText={setNewPackName}
+              placeholder="Nama pack (contoh: Bab 1, Latihan UTS)"
+              style={styles.modalInput}
+              placeholderTextColor={Colors.textMuted}
+              autoFocus
+            />
+            <TouchableOpacity style={styles.modalCreateBtn} onPress={handleCreatePackAndImport}>
+              <Text style={styles.modalCreateBtnText}>Buat Pack & Import</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowPackModal(false); setPendingImportItems([]); }}>
+              <Text style={styles.modalCancelText}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* ── AI PROMPT GENERATOR ── */}
       <View style={styles.aiCard}>
@@ -1034,4 +1138,55 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  // Packs
+  packsSection: { marginBottom: 12 },
+  packsSectionTitle: {
+    fontSize: 11, fontWeight: "800", color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 1, marginBottom: 8,
+  },
+  packChip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.white,
+  },
+  packChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  packChipText: { fontSize: 13, fontWeight: "700", color: Colors.textMuted },
+  packChipTextActive: { color: Colors.white },
+
+  // Modal overlay
+  modalOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center",
+    zIndex: 100, paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: Colors.white, borderRadius: 20, padding: 20, width: "100%", gap: 10,
+  },
+  modalTitle: { fontSize: 17, fontWeight: "900", color: Colors.dark },
+  modalSub: { fontSize: 13, color: Colors.textMuted, fontWeight: "500", marginBottom: 4 },
+  modalLabel: {
+    fontSize: 11, fontWeight: "800", color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 1,
+  },
+  modalPackRow: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12,
+    backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border,
+  },
+  modalPackName: { fontSize: 14, fontWeight: "700", color: Colors.dark },
+  modalPackCount: { fontSize: 12, color: Colors.textMuted, fontWeight: "600" },
+  modalDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 4 },
+  modalInput: {
+    backgroundColor: Colors.background, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 14, fontWeight: "600", color: Colors.dark,
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
+  modalCreateBtn: {
+    backgroundColor: Colors.primary, borderRadius: 12,
+    paddingVertical: 13, alignItems: "center",
+  },
+  modalCreateBtnText: { fontSize: 14, fontWeight: "900", color: Colors.white },
+  modalCancelBtn: { alignItems: "center", paddingVertical: 8 },
+  modalCancelText: { fontSize: 14, fontWeight: "700", color: Colors.textMuted },
 });
