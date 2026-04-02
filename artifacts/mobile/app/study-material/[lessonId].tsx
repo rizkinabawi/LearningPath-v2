@@ -29,7 +29,7 @@ import {
   ExternalLink,
   BookOpen,
   Clock,
-  Youtube,
+  Video,
   FileImage,
   Globe,
 } from "lucide-react-native";
@@ -96,7 +96,7 @@ const TYPE_INFO: Record<TabType, { icon: React.ReactNode; label: string; color: 
     bg: Colors.amberLight,
   },
   youtube: {
-    icon: <Youtube size={14} color="#FF0000" />,
+    icon: <Video size={14} color="#FF0000" />,
     label: "YouTube",
     color: "#FF0000",
     bg: "#FFF0F0",
@@ -493,7 +493,7 @@ export default function StudyMaterialScreen() {
                     {mat.type === "youtube" && (
                       <View style={styles.linkBox}>
                         <View style={styles.linkIconWrap}>
-                          <Youtube size={24} color="#FF0000" />
+                          <Video size={24} color="#FF0000" />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.linkLabel}>YouTube Video</Text>
