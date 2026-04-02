@@ -155,8 +155,8 @@ export default function LearnPage() {
         toast.success("Bundle berhasil diunduh!");
       } else {
         // 3. Write file to cache
-        const cacheDir = FileSystem.cacheDirectory;
-        if (!cacheDir) throw new Error("Cache directory tidak tersedia.");
+        const cacheDir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+        if (!cacheDir) throw new Error("Storage tidak tersedia di perangkat ini.");
         const fileUri = cacheDir + filename;
         try {
           await FileSystem.writeAsStringAsync(fileUri, json, {
