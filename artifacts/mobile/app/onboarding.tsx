@@ -15,6 +15,7 @@ import { saveUser, getUser, generateId, type User } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { Feather } from "@expo/vector-icons";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const { width } = Dimensions.get("window");
 
@@ -80,6 +81,7 @@ const TUTORIAL_STEPS = [
 export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   // Total steps: 4 tutorial + 2 setup (name, goal)
   const TOTAL_STEPS = 6;
@@ -136,19 +138,32 @@ export default function Onboarding() {
     router.replace("/(tabs)");
   };
 
+  const tutorialTitles = [
+    t.onboarding.step_welcome_title,
+    t.onboarding.step_paths_title,
+    t.onboarding.step_study_title,
+    t.onboarding.step_ai_title,
+  ];
+  const tutorialSubs = [
+    t.onboarding.step_welcome_sub,
+    t.onboarding.step_paths_sub,
+    t.onboarding.step_study_sub,
+    t.onboarding.step_ai_sub,
+  ];
+
   const isTutorial = step < 4;
   const tutorialData = isTutorial ? TUTORIAL_STEPS[step] : null;
   const ctaLabel =
-    step === 5 ? "Mulai Belajar! 🎉" :
-    step === 4 ? "Lanjut" :
-    step === 3 ? "Ayo Mulai!" : "Lanjut";
+    step === 5 ? t.onboarding.btn_finish :
+    step === 4 ? t.onboarding.btn_next :
+    step === 3 ? t.onboarding.btn_finish : t.onboarding.btn_next;
 
   return (
     <View style={[styles.root, { paddingTop: Platform.OS === "web" ? 60 : insets.top }]}>
       {/* Skip button — only on tutorial steps */}
       {isTutorial && (
         <TouchableOpacity onPress={handleSkip} style={styles.skipBtn} activeOpacity={0.7}>
-          <Text style={styles.skipText}>Lewati</Text>
+          <Text style={styles.skipText}>{t.onboarding.skip}</Text>
         </TouchableOpacity>
       )}
 
@@ -166,8 +181,8 @@ export default function Onboarding() {
                 <Text style={styles.illustrationEmoji}>{tutorialData.emoji}</Text>
               </View>
 
-              <Text style={styles.title}>{tutorialData.title}</Text>
-              <Text style={styles.sub}>{tutorialData.sub}</Text>
+              <Text style={styles.title}>{tutorialTitles[step]}</Text>
+              <Text style={styles.sub}>{tutorialSubs[step]}</Text>
 
               {tutorialData.features.length > 0 && (
                 <View style={styles.featureList}>
@@ -190,11 +205,11 @@ export default function Onboarding() {
               <View style={[styles.illustrationWrap, { backgroundColor: "#FFF8EB" }]}>
                 <Text style={styles.illustrationEmoji}>📝</Text>
               </View>
-              <Text style={styles.title}>Siapa namamu?</Text>
-              <Text style={styles.sub}>Kami ingin menyapa dengan namamu setiap hari.</Text>
+              <Text style={styles.title}>{t.onboarding.step_profile_title}</Text>
+              <Text style={styles.sub}>{t.onboarding.step_profile_sub}</Text>
               <View style={styles.inputsWrap}>
                 <TextInput
-                  placeholder="Nama kamu"
+                  placeholder={t.onboarding.name_ph}
                   value={name}
                   onChangeText={setName}
                   style={styles.input}
@@ -212,24 +227,24 @@ export default function Onboarding() {
               <View style={[styles.illustrationWrap, { backgroundColor: "#E0FAF8" }]}>
                 <Text style={styles.illustrationEmoji}>🎯</Text>
               </View>
-              <Text style={styles.title}>Apa targetmu?</Text>
-              <Text style={styles.sub}>Tentukan topik dan level belajarmu sekarang.</Text>
+              <Text style={styles.title}>{t.onboarding.step_ai_title}</Text>
+              <Text style={styles.sub}>{t.onboarding.step_ai_sub}</Text>
               <View style={styles.inputsWrap}>
                 <TextInput
-                  placeholder="Target belajar (misal: lulus JLPT N3)"
+                  placeholder={t.onboarding.goal_ph}
                   value={goal}
                   onChangeText={setGoal}
                   style={styles.input}
                   placeholderTextColor={Colors.textMuted}
                 />
                 <TextInput
-                  placeholder="Topik utama (misal: React Native)"
+                  placeholder={t.onboarding.topic_ph}
                   value={topic}
                   onChangeText={setTopic}
                   style={styles.input}
                   placeholderTextColor={Colors.textMuted}
                 />
-                <Text style={styles.levelLabel}>Level kamu saat ini</Text>
+                <Text style={styles.levelLabel}>{t.onboarding.level_label}</Text>
                 <View style={styles.levelRow}>
                   {LEVELS.map((l) => (
                     <TouchableOpacity
@@ -240,7 +255,7 @@ export default function Onboarding() {
                     >
                       <Text style={styles.levelEmoji}>{l.emoji}</Text>
                       <Text style={[styles.levelText, level === l.val && styles.levelTextActive]}>
-                        {l.label}
+                        {l.val === "beginner" ? t.onboarding.level_beginner : l.val === "intermediate" ? t.onboarding.level_intermediate : t.onboarding.level_advanced}
                       </Text>
                     </TouchableOpacity>
                   ))}

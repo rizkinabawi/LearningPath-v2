@@ -19,6 +19,7 @@ import {
   type Quiz,
 } from "@/utils/storage";
 import Colors, { shadow } from "@/constants/colors";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 type ReviewItem = {
   progress: Progress;
@@ -29,6 +30,7 @@ type ReviewItem = {
 export default function MistakesReview() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,26 +67,24 @@ export default function MistakesReview() {
           <Feather name="arrow-left" size={20} color={Colors.dark} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Review Kesalahan</Text>
+          <Text style={styles.headerTitle}>{t.mistakes.header_title}</Text>
           <Text style={styles.headerSub}>
-            {loading ? "Memuat..." : `${items.length} soal untuk dipelajari ulang`}
+            {loading ? t.mistakes.loading : t.mistakes.count(items.length)}
           </Text>
         </View>
       </View>
 
       {loading ? (
         <View style={styles.center}>
-          <Text style={styles.loadingText}>Memuat...</Text>
+          <Text style={styles.loadingText}>{t.mistakes.loading}</Text>
         </View>
       ) : items.length === 0 ? (
         <View style={styles.center}>
           <Text style={{ fontSize: 72 }}>🏆</Text>
-          <Text style={styles.emptyTitle}>Sempurna!</Text>
-          <Text style={styles.emptySub}>
-            Tidak ada kesalahan untuk direview. Pertahankan!
-          </Text>
+          <Text style={styles.emptyTitle}>{t.mistakes.empty_title}</Text>
+          <Text style={styles.emptySub}>{t.mistakes.empty_sub}</Text>
           <TouchableOpacity style={styles.ctaBtn} onPress={() => router.back()}>
-            <Text style={styles.ctaBtnText}>Kembali</Text>
+            <Text style={styles.ctaBtnText}>{t.common.back}</Text>
           </TouchableOpacity>
         </View>
       ) : (

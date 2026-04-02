@@ -12,6 +12,7 @@ import {
   type LearningPath, type Module, type Lesson,
 } from "@/utils/storage";
 import Colors, { shadowSm } from "@/constants/colors";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 interface LessonRow {
   path: LearningPath;
@@ -32,6 +33,7 @@ const GRAD: [string, string][] = [
 export default function FlashcardBrowseAll() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [rows, setRows] = useState<LessonRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -105,12 +107,12 @@ export default function FlashcardBrowseAll() {
             <Feather name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerSub}>Semua Flashcard</Text>
-            <Text style={styles.headerTitle}>Pilih Pelajaran</Text>
+            <Text style={styles.headerSub}>{t.common.cards.toUpperCase()}</Text>
+            <Text style={styles.headerTitle}>{t.browse.flash_header}</Text>
           </View>
           <View style={styles.countBadge}>
             <Text style={styles.countBadgeText}>{totalCards}</Text>
-            <Text style={styles.countBadgeSub}>kartu</Text>
+            <Text style={styles.countBadgeSub}>{t.common.cards.toLowerCase()}</Text>
           </View>
         </View>
 
@@ -120,7 +122,7 @@ export default function FlashcardBrowseAll() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Cari pelajaran atau kursus..."
+            placeholder={t.browse.search_ph}
             placeholderTextColor={Colors.textMuted}
             style={styles.searchInput}
           />
@@ -135,18 +137,16 @@ export default function FlashcardBrowseAll() {
       {loading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={Colors.primary} size="large" />
-          <Text style={styles.loadingText}>Memuat flashcard...</Text>
+          <Text style={styles.loadingText}>{t.common.loading}</Text>
         </View>
       ) : grouped.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyEmoji}>🃏</Text>
           <Text style={styles.emptyTitle}>
-            {rows.length === 0 ? "Belum Ada Flashcard" : "Tidak Ditemukan"}
+            {rows.length === 0 ? t.browse.empty_flash : t.browse.not_found}
           </Text>
           <Text style={styles.emptySub}>
-            {rows.length === 0
-              ? "Tambahkan flashcard dari menu Kursus → Pelajaran"
-              : "Coba kata kunci lain"}
+            {rows.length === 0 ? t.browse.flash_empty_sub : t.browse.try_other}
           </Text>
         </View>
       ) : (
@@ -170,7 +170,7 @@ export default function FlashcardBrowseAll() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.courseName} numberOfLines={1}>{path.name}</Text>
                     <Text style={styles.courseMeta}>
-                      {Object.keys(modules).length} modul · {total} flashcard
+                      {Object.keys(modules).length} {t.common.modules} · {total} {t.common.cards}
                     </Text>
                   </View>
                   <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={16} color={Colors.textMuted} />

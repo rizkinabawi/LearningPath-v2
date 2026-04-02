@@ -27,6 +27,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
 import { isCancellationError } from "@/utils/safe-share";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 type Tab = "stats" | "classify" | "prompts";
 
@@ -38,9 +39,9 @@ interface PathStat {
 }
 
 const DIFF_CONFIG = {
-  mudah:  { label: "Mudah",  color: Colors.teal, bg: Colors.tealLight, icon: "trending-up"  as const, emoji: "✅" },
-  sedang: { label: "Sedang", color: "#FF9500",  bg: "#FFF8EB",         icon: "minus-circle"  as const, emoji: "⚡" },
-  susah:  { label: "Susah",  color: "#FF6B6B",  bg: "#FFF0F0",         icon: "alert-triangle" as const, emoji: "🔥" },
+  mudah:  { color: Colors.teal, bg: Colors.tealLight, icon: "trending-up"  as const, emoji: "✅" },
+  sedang: { color: "#FF9500",  bg: "#FFF8EB",         icon: "minus-circle"  as const, emoji: "⚡" },
+  susah:  { color: "#FF6B6B",  bg: "#FFF0F0",         icon: "alert-triangle" as const, emoji: "🔥" },
 };
 
 const SHARE_GRADS: [string, string][] = [
@@ -54,6 +55,7 @@ const SHARE_GRADS: [string, string][] = [
 
 export default function ProgressTab() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
   const params = useLocalSearchParams<{ tab?: string }>();
@@ -111,7 +113,7 @@ export default function ProgressTab() {
 
   const handleExportPDF = async () => {
     if (Platform.OS === "web") {
-      toast.info("PDF hanya tersedia di iOS/Android");
+      toast.info(t.progress.pdf_only_native);
       return;
     }
     setPdfLoading(true);
@@ -121,13 +123,13 @@ export default function ProgressTab() {
       const { uri } = await Print.printToFileAsync({ html, base64: false });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Laporan Belajar" });
-        toast.success("PDF berhasil dibuat!");
+        await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: t.progress.share_image });
+        toast.success(t.progress.pdf_success);
       } else {
-        toast.info("PDF tersimpan di perangkat");
+        toast.info(t.progress.pdf_saved);
       }
     } catch (e) {
-      if (!isCancellationError(e)) toast.error("Gagal membuat PDF");
+      if (!isCancellationError(e)) toast.error(t.progress.pdf_error);
     } finally {
       setPdfLoading(false);
     }
@@ -135,7 +137,7 @@ export default function ProgressTab() {
 
   const handleShareImage = async () => {
     if (Platform.OS === "web") {
-      toast.info("Share gambar hanya tersedia di iOS/Android");
+      toast.info(t.progress.share_only_native);
       return;
     }
     if (!shareCardRef.current) return;
@@ -144,13 +146,13 @@ export default function ProgressTab() {
       const uri = await captureRef(shareCardRef, { format: "png", quality: 1 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Bagikan Progres" });
-        toast.success("Gambar berhasil dibagikan!");
+        await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: t.progress.share_btn });
+        toast.success(t.progress.share_success);
       } else {
-        toast.info("Sharing tidak tersedia di perangkat ini");
+        toast.info(t.progress.share_unavailable);
       }
     } catch (e) {
-      if (!isCancellationError(e)) toast.error("Gagal membuat gambar");
+      if (!isCancellationError(e)) toast.error(t.progress.share_error);
     } finally {
       setShareLoading(false);
     }
@@ -164,7 +166,7 @@ export default function ProgressTab() {
     const dayP = progress.filter((p) => p.timestamp.slice(0, 10) === key);
     const dayCorrect = dayP.filter((p) => p.isCorrect).length;
     const pct = dayP.length > 0 ? Math.round((dayCorrect / dayP.length) * 100) : 0;
-    weeklyBars.push({ day: d.toLocaleDateString("id-ID", { weekday: "short" }), pct });
+    weeklyBars.push({ day: d.toLocaleDateString(undefined, { weekday: "short" }), pct });
   }
   const maxPct = Math.max(...weeklyBars.map((b) => b.pct), 1);
 
@@ -172,10 +174,16 @@ export default function ProgressTab() {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 20);
 
+  const diffLabels: Record<string, string> = {
+    mudah: t.progress.easy,
+    sedang: t.progress.medium,
+    susah: t.progress.hard,
+  };
+
   const TABS: { key: Tab; icon: React.ComponentProps<typeof Feather>["name"]; label: string }[] = [
-    { key: "stats",    icon: "bar-chart-2", label: "Statistik" },
-    { key: "classify", icon: "layers",      label: "Klasifikasi" },
-    { key: "prompts",  icon: "zap",         label: "AI Prompt" },
+    { key: "stats",    icon: "bar-chart-2", label: t.progress.tab_stats },
+    { key: "classify", icon: "layers",      label: t.progress.tab_classify },
+    { key: "prompts",  icon: "zap",         label: t.progress.tab_prompts },
   ];
 
   return (
@@ -192,15 +200,15 @@ export default function ProgressTab() {
         {/* Title row */}
         <View style={styles.titleRow}>
           <View>
-            <Text style={styles.headerSub}>Perkembanganmu</Text>
-            <Text style={styles.headerTitle}>Progress</Text>
+            <Text style={styles.headerSub}>{t.progress.header_sub}</Text>
+            <Text style={styles.headerTitle}>{t.progress.header_title}</Text>
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity onPress={handleShareImage} style={styles.pdfBtn} activeOpacity={0.8}>
               <LinearGradient colors={["#38BDF8", "#0EA5E9"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.pdfBtnGrad}>
                 {shareLoading
                   ? <ActivityIndicator size="small" color="#fff" />
-                  : <><Feather name="image" size={14} color="#fff" /><Text style={styles.pdfBtnText}>Bagikan</Text></>
+                  : <><Feather name="image" size={14} color="#fff" /><Text style={styles.pdfBtnText}>{t.progress.share_btn}</Text></>
                 }
               </LinearGradient>
             </TouchableOpacity>
@@ -222,7 +230,7 @@ export default function ProgressTab() {
             <View style={styles.ringOuter}>
               <View style={styles.ringInner}>
                 <Text style={styles.ringVal}>{accuracy}%</Text>
-                <Text style={styles.ringLbl}>AKURASI</Text>
+                <Text style={styles.ringLbl}>{t.progress.accuracy.toUpperCase()}</Text>
               </View>
             </View>
             {/* Arc decoration */}
@@ -232,10 +240,10 @@ export default function ProgressTab() {
           {/* 4 stat chips */}
           <View style={styles.chipsGrid}>
             {[
-              { icon: "message-circle" as const, val: stats?.totalAnswers ?? 0, lbl: "Jawaban", grad: ["#4A9EFF","#6C63FF"] as [string,string] },
-              { icon: "check-circle"   as const, val: stats?.correctAnswers ?? 0, lbl: "Benar",   grad: [Colors.teal,"#0EA5E9"] as [string,string] },
-              { icon: "x-circle"       as const, val: wrong,                     lbl: "Salah",   grad: ["#FF6B6B","#EF4444"] as [string,string] },
-              { icon: "activity"       as const, val: stats?.streak ?? 0,        lbl: "Streak",  grad: ["#FF9500","#FF6B6B"] as [string,string] },
+              { icon: "message-circle" as const, val: stats?.totalAnswers ?? 0, lbl: t.progress.total_answers, grad: ["#4A9EFF","#6C63FF"] as [string,string] },
+              { icon: "check-circle"   as const, val: stats?.correctAnswers ?? 0, lbl: t.progress.correct, grad: [Colors.teal,"#0EA5E9"] as [string,string] },
+              { icon: "x-circle"       as const, val: wrong,                     lbl: t.progress.wrong, grad: ["#FF6B6B","#EF4444"] as [string,string] },
+              { icon: "activity"       as const, val: stats?.streak ?? 0,        lbl: t.progress.streak, grad: ["#FF9500","#FF6B6B"] as [string,string] },
             ].map((c, i) => (
               <View key={i} style={styles.chip}>
                 <LinearGradient colors={c.grad} style={styles.chipIcon}>
@@ -283,7 +291,7 @@ export default function ProgressTab() {
                 <LinearGradient colors={["#4A9EFF","#6C63FF"]} style={styles.cardHeadIcon}>
                   <Feather name="bar-chart-2" size={13} color="#fff" />
                 </LinearGradient>
-                <Text style={styles.cardTitle}>Akurasi 7 Hari</Text>
+                <Text style={styles.cardTitle}>{t.progress.section_accuracy7}</Text>
               </View>
               <Text style={styles.cardHint}>(%) per hari</Text>
             </View>
@@ -311,7 +319,7 @@ export default function ProgressTab() {
                 <LinearGradient colors={[Colors.teal,"#0EA5E9"]} style={styles.cardHeadIcon}>
                   <Feather name="target" size={13} color="#fff" />
                 </LinearGradient>
-                <Text style={styles.cardTitle}>Akurasi Keseluruhan</Text>
+                <Text style={styles.cardTitle}>{t.progress.section_accuracy_overall}</Text>
               </View>
               <Text style={[styles.cardHint, { fontSize: 18, fontWeight: "900", color: Colors.dark }]}>{accuracy}%</Text>
             </View>
@@ -323,7 +331,7 @@ export default function ProgressTab() {
                 backgroundColor={Colors.border}
               />
             </View>
-            <Text style={styles.progressSub}>{stats?.correctAnswers ?? 0} benar · {wrong} salah · {stats?.totalAnswers ?? 0} total</Text>
+            <Text style={styles.progressSub}>{stats?.correctAnswers ?? 0} {t.progress.correct.toLowerCase()} · {wrong} {t.progress.wrong.toLowerCase()} · {stats?.totalAnswers ?? 0} {t.progress.total_answers.toLowerCase()}</Text>
           </View>
 
           {/* Activity heatmap */}
@@ -334,7 +342,7 @@ export default function ProgressTab() {
                   <LinearGradient colors={["#7C3AED","#A855F7"]} style={styles.cardHeadIcon}>
                     <Feather name="grid" size={13} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.cardTitle}>Aktivitas Terbaru</Text>
+                  <Text style={styles.cardTitle}>{t.progress.section_weekly}</Text>
                 </View>
               </View>
               <View style={styles.heatmapWrap}>
@@ -354,11 +362,11 @@ export default function ProgressTab() {
               <View style={styles.heatLegend}>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: Colors.teal }]} />
-                  <Text style={styles.legendText}>Benar</Text>
+                  <Text style={styles.legendText}>{t.progress.correct}</Text>
                 </View>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: "#FF6B6B" }]} />
-                  <Text style={styles.legendText}>Salah</Text>
+                  <Text style={styles.legendText}>{t.progress.wrong}</Text>
                 </View>
                 <Text style={styles.legendText}>{recent.length} aktivitas</Text>
               </View>
@@ -373,16 +381,16 @@ export default function ProgressTab() {
                   <LinearGradient colors={["#FF9500","#FF6B6B"]} style={styles.cardHeadIcon}>
                     <Feather name="list" size={13} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.cardTitle}>Log Jawaban</Text>
+                  <Text style={styles.cardTitle}>{t.progress.section_log}</Text>
                 </View>
               </View>
               {recent.slice(0, 10).map((p, i) => (
                 <View key={i} style={[styles.logRow, i < Math.min(10, recent.length) - 1 && styles.logRowBorder]}>
                   <View style={[styles.logDot, { backgroundColor: p.isCorrect ? Colors.teal : "#FF6B6B" }]} />
                   <Feather name={p.flashcardId ? "credit-card" : "help-circle"} size={13} color={Colors.textMuted} />
-                  <Text style={styles.logDate}>{new Date(p.timestamp).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</Text>
+                  <Text style={styles.logDate}>{new Date(p.timestamp).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</Text>
                   <Text style={[styles.logResult, { color: p.isCorrect ? "#059669" : "#DC2626" }]}>
-                    {p.isCorrect ? "✓ Benar" : "✗ Salah"}
+                    {p.isCorrect ? t.progress.correct_mark : t.progress.wrong_mark}
                   </Text>
                   {p.userAnswer ? <Text style={styles.logAnswer} numberOfLines={1}>{p.userAnswer}</Text> : null}
                 </View>
@@ -394,8 +402,8 @@ export default function ProgressTab() {
             <LinearGradient colors={["#0A1628","#1A3066"]} style={styles.emptyGrad}>
               <View style={styles.hDot1} /><View style={styles.hDot2} />
               <Feather name="trending-up" size={40} color="rgba(74,158,255,0.6)" />
-              <Text style={styles.emptyTitle}>Belum Ada Data</Text>
-              <Text style={styles.emptySub}>Kerjakan flashcard atau kuis untuk melihat statistikmu di sini</Text>
+              <Text style={styles.emptyTitle}>{t.progress.tab_stats}</Text>
+              <Text style={styles.emptySub}>{t.progress.section_accuracy7}</Text>
             </LinearGradient>
           )}
 
@@ -436,9 +444,7 @@ export default function ProgressTab() {
                 <Text style={styles.cardTitle}>Klasifikasi Otomatis</Text>
               </View>
             </View>
-            <Text style={styles.classifyDesc}>
-              Soal diklasifikasikan berdasarkan akurasi percobaan kamu. Mudah (≥70%), Sedang (40–69%), Susah (&lt;40%).
-            </Text>
+            <Text style={styles.classifyDesc}>{t.progress.section_difficulty}</Text>
             <View style={styles.diffSummaryRow}>
               {(["mudah","sedang","susah"] as const).map((d) => {
                 const cfg = DIFF_CONFIG[d];
@@ -452,7 +458,7 @@ export default function ProgressTab() {
                   >
                     <Feather name={cfg.icon} size={16} color={cfg.color} />
                     <Text style={[styles.diffSummaryVal, { color: cfg.color }]}>{count}</Text>
-                    <Text style={[styles.diffSummaryLbl, { color: cfg.color }]}>{cfg.label}</Text>
+                    <Text style={[styles.diffSummaryLbl, { color: cfg.color }]}>{diffLabels[d]}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -473,16 +479,16 @@ export default function ProgressTab() {
                     >
                       <Feather name={cfg.icon} size={13} color="#fff" />
                     </LinearGradient>
-                    <Text style={styles.cardTitle}>Soal {cfg.label}</Text>
+                    <Text style={styles.cardTitle}>{diffLabels[activeDiff]}</Text>
                   </View>
-                  <Text style={[styles.cardHint, { color: cfg.color, fontWeight: "800" }]}>{items.length} soal</Text>
+                  <Text style={[styles.cardHint, { color: cfg.color, fontWeight: "800" }]}>{items.length}</Text>
                 </View>
 
                 {items.length === 0 ? (
                   <View style={styles.diffEmpty}>
                     <Feather name={cfg.icon} size={32} color={cfg.color} />
-                    <Text style={[styles.diffEmptyText, { color: cfg.color }]}>Belum ada soal {cfg.label.toLowerCase()}</Text>
-                    <Text style={styles.diffEmptySub}>Kerjakan lebih banyak latihan untuk melihat klasifikasi</Text>
+                    <Text style={[styles.diffEmptyText, { color: cfg.color }]}>{diffLabels[activeDiff]}</Text>
+                    <Text style={styles.diffEmptySub}>{t.progress.section_difficulty}</Text>
                   </View>
                 ) : (
                   items.map((item, i) => (
@@ -533,9 +539,9 @@ export default function ProgressTab() {
               </Text>
             </LinearGradient>
             <View>
-              <Text style={styles.shareUserName}>{user?.name ?? "Pengguna"}</Text>
+              <Text style={styles.shareUserName}>{user?.name ?? t.profile.header_title}</Text>
               <Text style={styles.shareUserLevel}>
-                {user?.level === "beginner" ? "Pemula" : user?.level === "intermediate" ? "Menengah" : "Mahir"}
+                {user?.level === "beginner" ? t.progress.level_beginner : user?.level === "intermediate" ? t.progress.level_intermediate : t.progress.level_advanced}
                 {user?.goal ? ` · ${user.goal}` : ""}
               </Text>
             </View>
@@ -545,28 +551,28 @@ export default function ProgressTab() {
           <View style={styles.shareAccRow}>
             <View style={styles.shareAccBox}>
               <Text style={styles.shareAccVal}>{accuracy}%</Text>
-              <Text style={styles.shareAccLbl}>Akurasi</Text>
+              <Text style={styles.shareAccLbl}>{t.progress.accuracy.toUpperCase()}</Text>
             </View>
             <View style={styles.shareStatGrid}>
               <View style={[styles.shareStatBox, { backgroundColor: Colors.teal + "22" }]}>
                 <Feather name="check-circle" size={16} color={Colors.teal} />
                 <Text style={[styles.shareStatVal, { color: Colors.teal }]}>{stats?.correctAnswers ?? 0}</Text>
-                <Text style={styles.shareStatLbl}>Benar</Text>
+                <Text style={styles.shareStatLbl}>{t.progress.correct}</Text>
               </View>
               <View style={[styles.shareStatBox, { backgroundColor: "#FF6B6B22" }]}>
                 <Feather name="x-circle" size={16} color="#FF6B6B" />
                 <Text style={[styles.shareStatVal, { color: "#FF6B6B" }]}>{wrong}</Text>
-                <Text style={styles.shareStatLbl}>Salah</Text>
+                <Text style={styles.shareStatLbl}>{t.progress.wrong}</Text>
               </View>
               <View style={[styles.shareStatBox, { backgroundColor: "#4C6FFF22" }]}>
                 <Feather name="book-open" size={16} color="#4C6FFF" />
                 <Text style={[styles.shareStatVal, { color: "#4C6FFF" }]}>{stats?.totalAnswers ?? 0}</Text>
-                <Text style={styles.shareStatLbl}>Total</Text>
+                <Text style={styles.shareStatLbl}>{t.progress.total_answers}</Text>
               </View>
               <View style={[styles.shareStatBox, { backgroundColor: "#FF950022" }]}>
                 <Feather name="zap" size={16} color="#FF9500" />
                 <Text style={[styles.shareStatVal, { color: "#FF9500" }]}>{stats?.streak ?? 0}</Text>
-                <Text style={styles.shareStatLbl}>Streak</Text>
+                <Text style={styles.shareStatLbl}>{t.progress.streak}</Text>
               </View>
             </View>
           </View>
@@ -596,7 +602,7 @@ export default function ProgressTab() {
           {/* Footer */}
           <View style={styles.shareFooter}>
             <Text style={styles.shareFooterDate}>
-              {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+              {new Date().toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}
             </Text>
             <Text style={styles.shareFooterApp}>MobileLearning App</Text>
           </View>

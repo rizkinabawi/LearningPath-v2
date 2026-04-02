@@ -48,6 +48,7 @@ import {
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
 import { isCancellationError } from "@/utils/safe-share";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const MATERIAL_DIR =
   ((FileSystem as any).documentDirectory ?? "") + "study-materials/";
@@ -68,7 +69,7 @@ const formatBytes = (bytes: number) => {
 
 const formatDate = (iso: string) => {
   const d = new Date(iso);
-  return d.toLocaleDateString("id-ID", {
+  return d.toLocaleDateString(undefined, {
     day: "numeric", month: "short", year: "numeric",
   });
 };
@@ -119,6 +120,7 @@ export default function StudyMaterialScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const { t } = useTranslation();
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
   const [lessonName, setLessonName] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -196,24 +198,24 @@ export default function StudyMaterialScreen() {
   };
 
   const handleSave = async () => {
-    if (!matTitle.trim()) { toast.error("Judul materi tidak boleh kosong"); return; }
+    if (!matTitle.trim()) { toast.error(t.material.error_title); return; }
 
     const urlTypes = ["youtube", "googledoc"] as const;
     const isUrlType = urlTypes.includes(activeTab as any);
 
-    if (isUrlType && !matContent.trim()) { toast.error("Masukkan URL"); return; }
+    if (isUrlType && !matContent.trim()) { toast.error(t.material.error_url); return; }
     if (activeTab === "youtube") {
       const url = matContent.trim().toLowerCase();
       const isValidYoutube = url.includes("youtube.com") || url.includes("youtu.be");
       if (!isValidYoutube) {
-        toast.error("URL tidak valid. Gunakan link YouTube (youtube.com atau youtu.be)");
+        toast.error(t.material.error_youtube);
         return;
       }
     }
-    if (activeTab === "text" && !matContent.trim()) { toast.error("Isi konten materi"); return; }
-    if (activeTab === "html" && !matContent.trim()) { toast.error("Isi konten HTML"); return; }
-    if (activeTab === "file" && !pickedFile) { toast.error("Pilih file terlebih dahulu"); return; }
-    if (activeTab === "image" && !pickedImage) { toast.error("Pilih gambar terlebih dahulu"); return; }
+    if (activeTab === "text" && !matContent.trim()) { toast.error(t.material.error_content); return; }
+    if (activeTab === "html" && !matContent.trim()) { toast.error(t.material.error_html); return; }
+    if (activeTab === "file" && !pickedFile) { toast.error(t.material.error_file); return; }
+    if (activeTab === "image" && !pickedImage) { toast.error(t.material.error_image); return; }
 
     const safeId = Array.isArray(lessonId) ? lessonId[0] : (lessonId ?? "");
 
@@ -267,24 +269,24 @@ export default function StudyMaterialScreen() {
       await saveStudyMaterial(mat);
       setShowModal(false);
       setPickedImage(null);
-      toast.success("Materi berhasil disimpan!");
+      toast.success(t.material.saved);
       loadData();
     } catch (e: any) {
-      toast.error(`Gagal menyimpan: ${e?.message ?? "Error tidak diketahui"}`);
+      toast.error(`${t.common.error}: ${e?.message ?? t.common.error}`);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (mat: StudyMaterial) => {
-    Alert.alert("Hapus Materi", `Hapus "${mat.title}"?`, [
-      { text: "Batal", style: "cancel" },
+    Alert.alert(t.material.delete_title, t.material.delete_msg(mat.title), [
+      { text: t.common.cancel, style: "cancel" },
       {
-        text: "Hapus",
+        text: t.common.delete,
         style: "destructive",
         onPress: async () => {
           await deleteStudyMaterial(mat.id);
-          toast.info("Materi dihapus");
+          toast.info(t.material.deleted);
           loadData();
         },
       },
@@ -340,12 +342,12 @@ export default function StudyMaterialScreen() {
   };
 
   const TABS: { key: TabType; label: string }[] = [
-    { key: "text", label: "Teks" },
-    { key: "html", label: "HTML" },
-    { key: "youtube", label: "YouTube" },
-    { key: "googledoc", label: "Docs" },
-    { key: "image", label: "Gambar" },
-    { key: "file", label: "File" },
+    { key: "text", label: t.material.tab_text },
+    { key: "html", label: t.material.tab_html },
+    { key: "youtube", label: t.material.tab_youtube },
+    { key: "googledoc", label: t.material.tab_googledoc },
+    { key: "image", label: t.material.tab_image },
+    { key: "file", label: t.material.tab_file },
   ];
 
   return (
@@ -364,7 +366,7 @@ export default function StudyMaterialScreen() {
           <Text style={styles.headerSub} numberOfLines={1}>
             {lessonName}
           </Text>
-          <Text style={styles.headerTitle}>Materi Belajar</Text>
+          <Text style={styles.headerTitle}>{t.common.material}</Text>
         </View>
         <TouchableOpacity onPress={openAdd} style={styles.addBtn}>
           <Plus size={20} color={Colors.white} />
@@ -383,10 +385,8 @@ export default function StudyMaterialScreen() {
             activeOpacity={0.85}
           >
             <BookOpen size={40} color={Colors.purple} strokeWidth={1.5} />
-            <Text style={styles.emptyTitle}>Belum Ada Materi</Text>
-            <Text style={styles.emptySub}>
-              Tambah teks, HTML, atau upload file PPT/PDF/DOC
-            </Text>
+            <Text style={styles.emptyTitle}>{t.material.empty_title}</Text>
+            <Text style={styles.emptySub}>{t.material.empty_sub}</Text>
           </TouchableOpacity>
         ) : (
           materials.map((mat) => {
@@ -559,7 +559,7 @@ export default function StudyMaterialScreen() {
             ]}
           >
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Tambah Materi</Text>
+            <Text style={styles.modalTitle}>{t.common.add} {t.common.material}</Text>
 
             <ScrollView
               keyboardShouldPersistTaps="handled"
@@ -595,11 +595,11 @@ export default function StudyMaterialScreen() {
                 ))}
               </ScrollView>
 
-              <Text style={styles.fieldLabel}>Judul Materi</Text>
+              <Text style={styles.fieldLabel}>{t.material.title_ph}</Text>
               <TextInput
                 value={matTitle}
                 onChangeText={setMatTitle}
-                placeholder="Judul materi..."
+                placeholder={t.material.title_ph}
                 style={styles.input}
                 placeholderTextColor={Colors.textMuted}
                 autoFocus
@@ -608,12 +608,12 @@ export default function StudyMaterialScreen() {
               {activeTab === "text" && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: 6 }]}>
-                    Isi Materi (Teks)
+                    {t.material.content_ph_text}
                   </Text>
                   <TextInput
                     value={matContent}
                     onChangeText={setMatContent}
-                    placeholder="Tulis materi pelajaran di sini..."
+                    placeholder={t.material.content_ph_text}
                     style={[styles.input, styles.textArea]}
                     placeholderTextColor={Colors.textMuted}
                     multiline
@@ -625,15 +625,15 @@ export default function StudyMaterialScreen() {
               {activeTab === "html" && (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: 6 }]}>
-                    Kode HTML
+                    {t.material.tab_html}
                   </Text>
                   <Text style={styles.fieldHint}>
-                    Salin HTML dari mana saja (presentasi, artikel, dokumen)
+                    {t.material.content_ph_html}
                   </Text>
                   <TextInput
                     value={matContent}
                     onChangeText={setMatContent}
-                    placeholder={"<h1>Judul</h1>\n<p>Isi materi...</p>"}
+                    placeholder={t.material.content_ph_html}
                     style={[styles.input, styles.textArea, styles.codeInput]}
                     placeholderTextColor={Colors.textMuted}
                     multiline
@@ -671,8 +671,8 @@ export default function StudyMaterialScreen() {
                       activeOpacity={0.8}
                     >
                       <Paperclip size={20} color={Colors.amber} />
-                      <Text style={styles.uploadBtnText}>Pilih File</Text>
-                      <Text style={styles.uploadBtnHint}>PPT, PDF, DOC, DOCX, dll</Text>
+                      <Text style={styles.uploadBtnText}>{t.material.pick_file}</Text>
+                      <Text style={styles.uploadBtnHint}>PPT, PDF, DOC, DOCX</Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -680,12 +680,12 @@ export default function StudyMaterialScreen() {
 
               {activeTab === "youtube" && (
                 <>
-                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>URL YouTube</Text>
-                  <Text style={styles.fieldHint}>Paste link video YouTube</Text>
+                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>{t.material.tab_youtube}</Text>
+                  <Text style={styles.fieldHint}>{t.material.content_ph_youtube}</Text>
                   <TextInput
                     value={matContent}
                     onChangeText={setMatContent}
-                    placeholder="https://youtube.com/watch?v=..."
+                    placeholder={t.material.content_ph_youtube}
                     style={styles.input}
                     placeholderTextColor={Colors.textMuted}
                     autoCapitalize="none"
@@ -697,12 +697,12 @@ export default function StudyMaterialScreen() {
 
               {activeTab === "googledoc" && (
                 <>
-                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>URL Google Docs / Slides / Sheets</Text>
-                  <Text style={styles.fieldHint}>Pastikan link publik/dapat dibagikan</Text>
+                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>{t.material.tab_googledoc}</Text>
+                  <Text style={styles.fieldHint}>{t.material.content_ph_googledoc}</Text>
                   <TextInput
                     value={matContent}
                     onChangeText={setMatContent}
-                    placeholder="https://docs.google.com/..."
+                    placeholder={t.material.content_ph_googledoc}
                     style={styles.input}
                     placeholderTextColor={Colors.textMuted}
                     autoCapitalize="none"
@@ -714,7 +714,7 @@ export default function StudyMaterialScreen() {
 
               {activeTab === "image" && (
                 <>
-                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>Gambar</Text>
+                  <Text style={[styles.fieldLabel, { marginTop: 6 }]}>{t.material.tab_image}</Text>
                   {pickedImage ? (
                     <View style={styles.pickedImageWrap}>
                       <Image source={{ uri: pickedImage }} style={styles.pickedImagePreview} resizeMode="cover" />
@@ -730,7 +730,7 @@ export default function StudyMaterialScreen() {
                       activeOpacity={0.8}
                     >
                       <FileImage size={20} color={Colors.success} />
-                      <Text style={[styles.uploadBtnText, { color: Colors.success }]}>Pilih Gambar</Text>
+                      <Text style={[styles.uploadBtnText, { color: Colors.success }]}>{t.material.pick_image}</Text>
                       <Text style={styles.uploadBtnHint}>JPG, PNG, WebP</Text>
                     </TouchableOpacity>
                   )}
@@ -743,7 +743,7 @@ export default function StudyMaterialScreen() {
                 onPress={() => setShowModal(false)}
                 style={styles.cancelBtn}
               >
-                <Text style={styles.cancelBtnText}>Batal</Text>
+                <Text style={styles.cancelBtnText}>{t.common.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSave}
@@ -751,7 +751,7 @@ export default function StudyMaterialScreen() {
                 disabled={saving}
               >
                 <Text style={styles.saveBtnText}>
-                  {saving ? "Menyimpan..." : "Simpan"}
+                  {saving ? t.common.saving : t.common.save}
                 </Text>
               </TouchableOpacity>
             </View>

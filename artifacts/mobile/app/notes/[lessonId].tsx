@@ -33,12 +33,14 @@ import {
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function NotesScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const { t } = useTranslation();
   const [notes, setNotes] = useState<Note[]>([]);
   const [lessonName, setLessonName] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -76,7 +78,7 @@ export default function NotesScreen() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      toast.error("Judul catatan tidak boleh kosong");
+      toast.error(t.notes.error_title);
       return;
     }
     setSaving(true);
@@ -92,19 +94,19 @@ export default function NotesScreen() {
     await saveNote(note);
     setSaving(false);
     setShowModal(false);
-    toast.success(editNote ? "Catatan diperbarui!" : "Catatan disimpan!");
+    toast.success(editNote ? t.notes.updated : t.notes.saved);
     loadData();
   };
 
   const handleDelete = (note: Note) => {
-    Alert.alert("Hapus Catatan", `Hapus "${note.title}"?`, [
-      { text: "Batal", style: "cancel" },
+    Alert.alert(t.notes.delete_title, t.notes.delete_msg(note.title), [
+      { text: t.common.cancel, style: "cancel" },
       {
-        text: "Hapus",
+        text: t.common.delete,
         style: "destructive",
         onPress: async () => {
           await deleteNote(note.id);
-          toast.info("Catatan dihapus");
+          toast.info(t.notes.deleted);
           loadData();
         },
       },
@@ -139,7 +141,7 @@ export default function NotesScreen() {
           <Text style={styles.headerSub} numberOfLines={1}>
             {lessonName}
           </Text>
-          <Text style={styles.headerTitle}>Catatan</Text>
+          <Text style={styles.headerTitle}>{t.common.notes}</Text>
         </View>
         <TouchableOpacity onPress={openAdd} style={styles.addBtn}>
           <Plus size={20} color={Colors.white} />
@@ -154,10 +156,8 @@ export default function NotesScreen() {
         {notes.length === 0 ? (
           <TouchableOpacity style={styles.emptyCard} onPress={openAdd} activeOpacity={0.85}>
             <FileText size={40} color={Colors.primary} strokeWidth={1.5} />
-            <Text style={styles.emptyTitle}>Belum Ada Catatan</Text>
-            <Text style={styles.emptySub}>
-              Tap tombol + untuk menambah catatan baru
-            </Text>
+            <Text style={styles.emptyTitle}>{t.notes.empty_title}</Text>
+            <Text style={styles.emptySub}>{t.notes.empty_sub}</Text>
           </TouchableOpacity>
         ) : (
           notes.map((note) => {
@@ -230,24 +230,24 @@ export default function NotesScreen() {
           >
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>
-              {editNote ? "Edit Catatan" : "Catatan Baru"}
+              {editNote ? t.notes.modal_edit : t.notes.modal_new}
             </Text>
 
-            <Text style={styles.fieldLabel}>Judul</Text>
+            <Text style={styles.fieldLabel}>{t.notes.title_ph.replace("...", "")}</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="Judul catatan..."
+              placeholder={t.notes.title_ph}
               style={styles.input}
               placeholderTextColor={Colors.textMuted}
               autoFocus
             />
 
-            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Isi Catatan</Text>
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>{t.common.notes}</Text>
             <TextInput
               value={content}
               onChangeText={setContent}
-              placeholder="Tulis catatanmu di sini..."
+              placeholder={t.notes.content_ph}
               style={[styles.input, styles.textArea]}
               placeholderTextColor={Colors.textMuted}
               multiline
@@ -259,7 +259,7 @@ export default function NotesScreen() {
                 onPress={() => setShowModal(false)}
                 style={styles.cancelBtn}
               >
-                <Text style={styles.cancelBtnText}>Batal</Text>
+                <Text style={styles.cancelBtnText}>{t.common.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSave}
@@ -267,7 +267,7 @@ export default function NotesScreen() {
                 disabled={saving}
               >
                 <Text style={styles.saveBtnText}>
-                  {saving ? "Menyimpan..." : "Simpan"}
+                  {saving ? t.common.saving : t.common.save}
                 </Text>
               </TouchableOpacity>
             </View>

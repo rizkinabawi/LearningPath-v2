@@ -25,12 +25,14 @@ import {
 import Colors from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
 import { AchievementPopup } from "@/components/AchievementPopup";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function QuizScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const { t } = useTranslation();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -110,17 +112,17 @@ export default function QuizScreen() {
   if (quizzes.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyTitle}>Belum Ada Soal</Text>
-        <Text style={styles.emptySub}>Tambahkan soal quiz ke pelajaran ini dulu.</Text>
+        <Text style={styles.emptyTitle}>{t.quiz.empty_title}</Text>
+        <Text style={styles.emptySub}>{t.quiz.empty_sub}</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => router.push(`/create-quiz/${lessonId}`)}
         >
           <Plus size={16} color={Colors.white} />
-          <Text style={styles.addBtnText}>Tambah Soal</Text>
+          <Text style={styles.addBtnText}>{t.quiz.add_btn}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()} style={styles.backLink}>
-          <Text style={styles.backLinkText}>Kembali</Text>
+          <Text style={styles.backLinkText}>{t.common.back}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -136,9 +138,9 @@ export default function QuizScreen() {
         ]}
       >
         <Text style={styles.resultEmoji}>{pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪"}</Text>
-        <Text style={styles.resultTitle}>Quiz Selesai!</Text>
+        <Text style={styles.resultTitle}>{t.quiz.result_title}</Text>
         <Text style={styles.resultScore}>{pct}%</Text>
-        <Text style={styles.resultSub}>{score} / {quizzes.length} benar</Text>
+        <Text style={styles.resultSub}>{t.quiz.result_correct(score, quizzes.length)}</Text>
         <View style={{ width: "100%", marginVertical: 8 }}>
           <ProgressBar
             value={pct}
@@ -149,10 +151,10 @@ export default function QuizScreen() {
         <View style={styles.resultBtns}>
           <TouchableOpacity style={styles.restartBtn} onPress={handleRestart}>
             <RotateCcw size={16} color={Colors.white} />
-            <Text style={styles.restartBtnText}>Ulangi</Text>
+            <Text style={styles.restartBtnText}>{t.common.restart}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Selesai</Text>
+            <Text style={styles.doneBtnText}>{t.common.done}</Text>
           </TouchableOpacity>
         </View>
         {nextLesson && (
@@ -160,7 +162,7 @@ export default function QuizScreen() {
             style={styles.nextLessonBtn}
             onPress={() => router.replace(`/quiz/${nextLesson.id}`)}
           >
-            <Text style={styles.nextLessonBtnText}>Lanjut: {nextLesson.name}</Text>
+            <Text style={styles.nextLessonBtnText}>{t.common.next}: {nextLesson.name}</Text>
             <Text style={styles.nextLessonArrow}>→</Text>
           </TouchableOpacity>
         )}
@@ -209,7 +211,7 @@ export default function QuizScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.questionCard}>
-          <Text style={styles.questionLabel}>Soal {currentIndex + 1}</Text>
+          <Text style={styles.questionLabel}>{t.quiz.question_n(currentIndex + 1)}</Text>
           {/* Image above question */}
           {currentQuiz.image && (
             <Image
@@ -287,7 +289,7 @@ export default function QuizScreen() {
         {isAnswered && (
           <TouchableOpacity onPress={handleNext} style={styles.nextBtn}>
             <Text style={styles.nextBtnText}>
-              {currentIndex === quizzes.length - 1 ? "Lihat Hasil" : "Soal Berikutnya"}
+              {currentIndex === quizzes.length - 1 ? t.quiz.btn_finish : t.quiz.btn_next}
             </Text>
             <ChevronRight size={20} color={Colors.white} />
           </TouchableOpacity>

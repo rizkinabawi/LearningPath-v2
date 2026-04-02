@@ -41,6 +41,7 @@ import {
   type QuizPack,
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { toast } from "@/components/Toast";
 
 const IMAGE_DIR = ((FileSystem as any).documentDirectory ?? "") + "quiz-images/";
@@ -126,6 +127,7 @@ export default function CreateQuizScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const { t } = useTranslation();
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctOption, setCorrectOption] = useState<number | null>(null);
@@ -186,16 +188,16 @@ export default function CreateQuizScreen() {
 
   const handleSave = async () => {
     if (!question.trim()) {
-      Alert.alert("Isi Pertanyaan", "Pertanyaan tidak boleh kosong.");
+      Alert.alert(t.create_qz.question_ph, t.create_qz.fill_question);
       return;
     }
     const filledOptions = options.filter((o) => o.trim());
     if (filledOptions.length < 2) {
-      Alert.alert("Minimal 2 Pilihan", "Isi minimal 2 pilihan jawaban.");
+      Alert.alert(t.create_qz.question_ph, t.create_qz.fill_options);
       return;
     }
     if (correctOption === null || !options[correctOption]?.trim()) {
-      Alert.alert("Pilih Jawaban Benar", "Tandai salah satu pilihan sebagai jawaban benar.");
+      Alert.alert(t.create_qz.answer_label, t.create_qz.pick_answer);
       return;
     }
     setLoading(true);
@@ -225,13 +227,13 @@ export default function CreateQuizScreen() {
     setCorrectOption(null);
     setImageUri(null);
     setLoading(false);
-    toast.success("Soal berhasil ditambahkan!");
+    toast.success(t.create_qz.added);
   };
 
   const handleDelete = async (id: string) => {
     await deleteQuiz(id);
     setExisting((prev) => prev.filter((q) => q.id !== id));
-    toast.info("Soal dihapus");
+    toast.info(t.create_qz.deleted);
   };
 
   const parseValidQuizItems = (rawItems: any[]) => {
@@ -326,9 +328,9 @@ export default function CreateQuizScreen() {
     setShowPackModal(false);
     setNewPackName("");
     if (count > 0) {
-      toast.success(`${count} soal berhasil diimport!`);
+      toast.success(t.create_qz.import_done(count));
     } else {
-      toast.error("Tidak ada soal yang berhasil disimpan.");
+      toast.error(t.create_qz.no_saved);
     }
   };
 
@@ -351,14 +353,14 @@ export default function CreateQuizScreen() {
   };
 
   const handleDeletePack = async (packId: string) => {
-    Alert.alert("Hapus Pack", "Hapus pack ini?", [
-      { text: "Batal", style: "cancel" },
+    Alert.alert(t.create_qz.delete_pack_title, t.create_qz.delete_pack_msg, [
+      { text: t.common.cancel, style: "cancel" },
       {
-        text: "Hapus", style: "destructive", onPress: async () => {
+        text: t.common.delete, style: "destructive", onPress: async () => {
           await deleteQuizPack(packId);
           setPacks((prev) => prev.filter((p) => p.id !== packId));
           if (activePack?.id === packId) setActivePack(null);
-          toast.info("Pack dihapus");
+          toast.info(t.create_qz.pack_deleted);
         },
       },
     ]);
@@ -366,7 +368,7 @@ export default function CreateQuizScreen() {
 
   const handleGenerateAndCopyPrompt = async () => {
     if (!promptTopic.trim()) {
-      toast.error("Isi topik materi terlebih dahulu");
+      toast.error(t.create_qz.prompt_fill_topic);
       return;
     }
     const count = parseInt(promptCount) || 10;
@@ -374,7 +376,7 @@ export default function CreateQuizScreen() {
     setGeneratedPrompt(prompt);
     await Clipboard.setStringAsync(prompt);
     setPromptCopied(true);
-    toast.success("Prompt berhasil disalin! Tempel ke ChatGPT/Gemini.");
+    toast.success(t.create_qz.prompt_copied);
     setTimeout(() => setPromptCopied(false), 3000);
   };
 
@@ -399,7 +401,7 @@ export default function CreateQuizScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tambah Soal Quiz</Text>
+        <Text style={styles.headerTitle}>{t.create_qz.add_quiz_btn}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <X size={20} color={Colors.dark} />
         </TouchableOpacity>
@@ -488,10 +490,8 @@ export default function CreateQuizScreen() {
               <Bot size={18} color={Colors.white} />
             </View>
             <View>
-              <Text style={styles.aiCardTitle}>Buat Soal dengan AI</Text>
-              <Text style={styles.aiCardSub}>
-                Salin prompt → tempel ke ChatGPT/Gemini → import hasilnya
-              </Text>
+              <Text style={styles.aiCardTitle}>{t.create_qz.section_import}</Text>
+              <Text style={styles.aiCardSub}>{t.create_qz.section_prompt}</Text>
             </View>
           </View>
           {showPrompt ? (
@@ -719,7 +719,7 @@ export default function CreateQuizScreen() {
       {/* ── MANUAL FORM ── */}
       <View style={styles.form}>
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Pertanyaan</Text>
+          <Text style={styles.fieldLabel}>{t.create_qz.question_ph.split("?")[0]}</Text>
           <TextInput
             placeholder="Contoh: Apa yang dikembalikan useState?"
             value={question}
@@ -759,7 +759,7 @@ export default function CreateQuizScreen() {
           )}
         </View>
 
-        <Text style={styles.fieldLabel}>Pilihan Jawaban</Text>
+        <Text style={styles.fieldLabel}>{t.create_qz.answer_label}</Text>
         <Text style={styles.fieldHint}>
           Tap salah satu pilihan untuk menandai sebagai jawaban benar
         </Text>
@@ -833,10 +833,10 @@ export default function CreateQuizScreen() {
               </View>
               <TouchableOpacity
                 onPress={() => {
-                  Alert.alert("Hapus", "Hapus soal ini?", [
-                    { text: "Batal", style: "cancel" },
+                  Alert.alert(t.create_qz.delete_quiz_title, t.create_qz.delete_quiz_msg, [
+                    { text: t.common.cancel, style: "cancel" },
                     {
-                      text: "Hapus",
+                      text: t.common.delete,
                       style: "destructive",
                       onPress: () => handleDelete(q.id),
                     },

@@ -25,11 +25,13 @@ import {
 import Colors from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
 import { AchievementPopup } from "@/components/AchievementPopup";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function FlashcardScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -111,17 +113,17 @@ export default function FlashcardScreen() {
   if (cards.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyTitle}>Belum Ada Flashcard</Text>
-        <Text style={styles.emptySub}>Tambahkan flashcard ke pelajaran ini dulu.</Text>
+        <Text style={styles.emptyTitle}>{t.flashcard.empty_title}</Text>
+        <Text style={styles.emptySub}>{t.flashcard.empty_sub}</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => router.push(`/create-flashcard/${lessonId}`)}
         >
           <Plus size={16} color={Colors.white} />
-          <Text style={styles.addBtnText}>Tambah Flashcard</Text>
+          <Text style={styles.addBtnText}>{t.flashcard.add_btn}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()} style={styles.backLink}>
-          <Text style={styles.backLinkText}>Kembali</Text>
+          <Text style={styles.backLinkText}>{t.common.back}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -138,9 +140,9 @@ export default function FlashcardScreen() {
         ]}
       >
         <Text style={styles.resultEmoji}>{pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪"}</Text>
-        <Text style={styles.resultTitle}>Sesi Selesai!</Text>
+        <Text style={styles.resultTitle}>{t.flashcard.result_title}</Text>
         <Text style={styles.resultScore}>{pct}%</Text>
-        <Text style={styles.resultSub}>{correctCount} / {cards.length} benar</Text>
+        <Text style={styles.resultSub}>{t.flashcard.result_correct(correctCount, cards.length)}</Text>
         <View style={{ width: "100%", marginVertical: 8 }}>
           <ProgressBar
             value={pct}
@@ -151,10 +153,10 @@ export default function FlashcardScreen() {
         <View style={styles.resultBtns}>
           <TouchableOpacity style={styles.restartBtn} onPress={handleRestart}>
             <RotateCcw size={16} color={Colors.white} />
-            <Text style={styles.restartBtnText}>Ulangi</Text>
+            <Text style={styles.restartBtnText}>{t.common.restart}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Selesai</Text>
+            <Text style={styles.doneBtnText}>{t.common.done}</Text>
           </TouchableOpacity>
         </View>
         {nextLesson && (
@@ -162,7 +164,7 @@ export default function FlashcardScreen() {
             style={styles.nextLessonBtn}
             onPress={() => router.replace(`/flashcard/${nextLesson.id}`)}
           >
-            <Text style={styles.nextLessonBtnText}>Lanjut: {nextLesson.name}</Text>
+            <Text style={styles.nextLessonBtnText}>{t.common.next}: {nextLesson.name}</Text>
             <Text style={styles.nextLessonArrow}>→</Text>
           </TouchableOpacity>
         )}
@@ -247,7 +249,7 @@ export default function FlashcardScreen() {
             )}
             <Text style={styles.cardHint}>Pertanyaan</Text>
             <Text style={styles.cardText}>{card.question}</Text>
-            <Text style={styles.tapHint}>Tap untuk lihat jawaban</Text>
+            <Text style={styles.tapHint}>{t.flashcard.card_hint}</Text>
           </Animated.View>
 
           {/* Back */}
@@ -280,19 +282,19 @@ export default function FlashcardScreen() {
             style={[styles.answerBtn, styles.wrongBtn]}
           >
             <X size={24} color={Colors.danger} />
-            <Text style={[styles.answerBtnText, { color: Colors.danger }]}>Salah</Text>
+            <Text style={[styles.answerBtnText, { color: Colors.danger }]}>{t.flashcard.btn_wrong}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => handleAnswer(true)}
             style={[styles.answerBtn, styles.correctBtn]}
           >
             <Check size={24} color={Colors.success} />
-            <Text style={[styles.answerBtnText, { color: Colors.success }]}>Benar!</Text>
+            <Text style={[styles.answerBtnText, { color: Colors.success }]}>{t.flashcard.btn_correct}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.flipHintWrap}>
-          <Text style={styles.flipHintText}>Tap kartu untuk membaliknya</Text>
+          <Text style={styles.flipHintText}>{t.flashcard.card_hint}</Text>
         </View>
       )}
     </View>

@@ -27,6 +27,7 @@ import {
   generateId, getLessons, type Flashcard, type FlashcardPack,
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { toast } from "@/components/Toast";
 
 const IMAGE_DIR = (FileSystem.documentDirectory ?? "") + "flashcard-images/";
@@ -105,6 +106,7 @@ export default function CreateFlashcardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const { t } = useTranslation();
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [tag, setTag] = useState("");
@@ -165,7 +167,7 @@ export default function CreateFlashcardScreen() {
 
   const handleSave = async () => {
     if (!question.trim() || !answer.trim()) {
-      Alert.alert("Lengkapi Form", "Pertanyaan dan jawaban wajib diisi.");
+      Alert.alert(t.create_fc.question_ph, t.create_fc.fill_form);
       return;
     }
     setLoading(true);
@@ -194,13 +196,13 @@ export default function CreateFlashcardScreen() {
     setTag("");
     setImageUri(null);
     setLoading(false);
-    toast.success("Flashcard berhasil ditambahkan!");
+    toast.success(t.create_fc.added);
   };
 
   const handleDelete = async (id: string) => {
     await deleteFlashcard(id);
     setExisting((prev) => prev.filter((c) => c.id !== id));
-    toast.info("Flashcard dihapus");
+    toast.info(t.create_fc.deleted);
   };
 
   const handleImportJson = async () => {
@@ -276,9 +278,9 @@ export default function CreateFlashcardScreen() {
     setShowPackModal(false);
     setNewPackName("");
     if (count > 0) {
-      toast.success(`${count} flashcard berhasil diimport!`);
+      toast.success(t.create_fc.import_done(count));
     } else {
-      toast.error("Tidak ada flashcard yang berhasil disimpan.");
+      toast.error(t.create_fc.no_saved);
     }
   };
 
@@ -301,14 +303,14 @@ export default function CreateFlashcardScreen() {
   };
 
   const handleDeletePack = async (packId: string) => {
-    Alert.alert("Hapus Pack", "Hapus pack ini? Semua flashcard di dalamnya tetap ada tapi tidak berpack.", [
-      { text: "Batal", style: "cancel" },
+    Alert.alert(t.create_fc.delete_pack_title, t.create_fc.delete_pack_msg, [
+      { text: t.common.cancel, style: "cancel" },
       {
-        text: "Hapus", style: "destructive", onPress: async () => {
+        text: t.common.delete, style: "destructive", onPress: async () => {
           await deleteFlashcardPack(packId);
           setPacks((prev) => prev.filter((p) => p.id !== packId));
           if (activePack?.id === packId) setActivePack(null);
-          toast.info("Pack dihapus");
+          toast.info(t.create_fc.pack_deleted);
         },
       },
     ]);
@@ -316,7 +318,7 @@ export default function CreateFlashcardScreen() {
 
   const handleGenerateAndCopyPrompt = async () => {
     if (!promptTopic.trim()) {
-      toast.error("Isi topik materi terlebih dahulu");
+      toast.error(t.create_fc.prompt_fill_topic);
       return;
     }
     const count = parseInt(promptCount) || 10;
@@ -324,7 +326,7 @@ export default function CreateFlashcardScreen() {
     setGeneratedPrompt(prompt);
     await Clipboard.setStringAsync(prompt);
     setPromptCopied(true);
-    toast.success("Prompt berhasil disalin! Tempel ke ChatGPT/Gemini.");
+    toast.success(t.create_fc.prompt_copied);
     setTimeout(() => setPromptCopied(false), 3000);
   };
 
@@ -349,7 +351,7 @@ export default function CreateFlashcardScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tambah Flashcard</Text>
+        <Text style={styles.headerTitle}>{t.create_fc.add_card_btn}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <X size={20} color={Colors.dark} />
         </TouchableOpacity>
@@ -359,7 +361,7 @@ export default function CreateFlashcardScreen() {
       {/* ── FLASHCARD PACKS ── */}
       {packs.length > 0 && (
         <View style={styles.packsSection}>
-          <Text style={styles.packsSectionTitle}>Pack Flashcard</Text>
+          <Text style={styles.packsSectionTitle}>{t.create_fc.section_packs}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
             <TouchableOpacity
               style={[styles.packChip, !activePack && styles.packChipActive]}
@@ -447,10 +449,8 @@ export default function CreateFlashcardScreen() {
               <Bot size={18} color={Colors.white} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.aiCardTitle}>Buat Flashcard dengan AI</Text>
-              <Text style={styles.aiCardSub}>
-                Salin prompt → tempel ke ChatGPT/Gemini → import hasilnya
-              </Text>
+              <Text style={styles.aiCardTitle}>{t.create_fc.section_import}</Text>
+              <Text style={styles.aiCardSub}>{t.create_fc.section_prompt}</Text>
             </View>
           </View>
           {showPrompt ? (
@@ -644,7 +644,7 @@ export default function CreateFlashcardScreen() {
       {/* ── MANUAL FORM ── */}
       <View style={styles.form}>
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Pertanyaan</Text>
+          <Text style={styles.fieldLabel}>{t.create_fc.question_ph.split("?")[0]}</Text>
           <TextInput
             placeholder="Contoh: Apa itu JSX?"
             value={question}
@@ -655,7 +655,7 @@ export default function CreateFlashcardScreen() {
           />
         </View>
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Jawaban</Text>
+          <Text style={styles.fieldLabel}>{t.flashcard.card_hint}</Text>
           <TextInput
             placeholder="Contoh: JSX adalah ekstensi sintaks JavaScript..."
             value={answer}
@@ -720,9 +720,9 @@ export default function CreateFlashcardScreen() {
               </View>
               <TouchableOpacity
                 onPress={() => {
-                  Alert.alert("Hapus", "Hapus flashcard ini?", [
-                    { text: "Batal", style: "cancel" },
-                    { text: "Hapus", style: "destructive", onPress: () => handleDelete(card.id) },
+                  Alert.alert(t.create_fc.delete_card_title, t.create_fc.delete_card_msg, [
+                    { text: t.common.cancel, style: "cancel" },
+                    { text: t.common.delete, style: "destructive", onPress: () => handleDelete(card.id) },
                   ]);
                 }}
                 style={styles.deleteBtn}
