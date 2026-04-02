@@ -8,7 +8,8 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -20,6 +21,203 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+// ─── Animated loading dots ───────────────────────────────────────────────────
+function LoadingDot({ delay }: { delay: number }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 350,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 350,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(Math.max(0, 700 - delay)),
+      ])
+    ).start();
+  }, []);
+
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
+
+  return (
+    <Animated.View
+      style={[
+        splashStyles.dot,
+        { transform: [{ translateY }], opacity },
+      ]}
+    />
+  );
+}
+
+// ─── Splash screen progress bar ──────────────────────────────────────────────
+function ProgressBar() {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const marginLeft = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["-40%", "100%"],
+  });
+
+  return (
+    <View style={splashStyles.barTrack}>
+      <Animated.View style={[splashStyles.barFill, { marginLeft }]} />
+    </View>
+  );
+}
+
+// ─── Logo pulse ──────────────────────────────────────────────────────────────
+function PulseLogo() {
+  const scale = useRef(new Animated.Value(0.8)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 6,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={[splashStyles.logoWrap, { transform: [{ scale }], opacity }]}>
+      <Text style={splashStyles.logoEmoji}>🎓</Text>
+    </Animated.View>
+  );
+}
+
+// ─── Full splash / loading screen ────────────────────────────────────────────
+function AppLoadingScreen() {
+  const textOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(textOpacity, {
+      toValue: 1,
+      duration: 500,
+      delay: 200,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  return (
+    <View style={splashStyles.container}>
+      <PulseLogo />
+      <Animated.View style={{ opacity: textOpacity, alignItems: "center" }}>
+        <Text style={splashStyles.appName}>LearningPath</Text>
+        <Text style={splashStyles.tagline}>Belajar lebih cerdas setiap hari</Text>
+      </Animated.View>
+      <View style={splashStyles.dotsRow}>
+        <LoadingDot delay={0} />
+        <LoadingDot delay={180} />
+        <LoadingDot delay={360} />
+      </View>
+      <ProgressBar />
+    </View>
+  );
+}
+
+const splashStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F4F7FF",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 0,
+  },
+  logoWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 26,
+    backgroundColor: "#4C6FFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    shadowColor: "#4C6FFF",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  logoEmoji: {
+    fontSize: 42,
+    lineHeight: 52,
+  },
+  appName: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#0F1F3D",
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  tagline: {
+    fontSize: 14,
+    color: "#99AAC3",
+    marginBottom: 40,
+  },
+  dotsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 48,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#4C6FFF",
+  },
+  barTrack: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: "#E6ECF8",
+    overflow: "hidden",
+  },
+  barFill: {
+    height: "100%",
+    width: "40%",
+    backgroundColor: "#4C6FFF",
+    borderRadius: 2,
+  },
+});
+
+// ─── Navigation stack ─────────────────────────────────────────────────────────
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
@@ -67,7 +265,7 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!fontsLoaded && !fontError) return <AppLoadingScreen />;
 
   return (
     <SafeAreaProvider>
