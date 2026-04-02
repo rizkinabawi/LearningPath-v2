@@ -1,3 +1,52 @@
+/**
+ * AdBanner — Google AdMob Banner Component
+ *
+ * ══════════════════════════════════════════════════════════════════
+ * STATUS: MOCK (iklan palsu) — lihat panduan di bawah untuk aktifkan
+ * ══════════════════════════════════════════════════════════════════
+ *
+ * CARA AKTIFKAN IKLAN NYATA (4 Langkah):
+ *
+ * LANGKAH 1 — Daftar & Setup AdMob Console
+ *   → Buka https://admob.google.com
+ *   → Login dengan Google Account
+ *   → Klik "Tambahkan Aplikasi" → pilih Android atau iOS
+ *   → Isi nama app & store (Google Play / App Store)
+ *   → Salin "ID Aplikasi" (format: ca-app-pub-XXXXXXXX~XXXXXXXXXX)
+ *
+ * LANGKAH 2 — Buat Ad Unit (Banner)
+ *   → Di sidebar klik "Unit Iklan" → "Tambah Unit Iklan"
+ *   → Pilih tipe "Banner"
+ *   → Salin "ID Unit Iklan" (format: ca-app-pub-XXXXXXXX/XXXXXXXXXX)
+ *
+ * LANGKAH 3 — Isi ID di app.json
+ *   Di app.json, tambahkan/ganti bagian ini:
+ *
+ *   "plugins": [
+ *     ...,
+ *     ["react-native-google-mobile-ads", {
+ *       "androidAppId": "ca-app-pub-XXXXXXXX~XXXXXXXXXX",   ← App ID Android
+ *       "iosAppId": "ca-app-pub-XXXXXXXX~XXXXXXXXXX"        ← App ID iOS
+ *     }]
+ *   ]
+ *
+ *   Dan tambahkan di .env atau Replit Secrets:
+ *     EXPO_PUBLIC_ADMOB_BANNER_ANDROID=ca-app-pub-XXXXXXXX/XXXXXXXXXX
+ *     EXPO_PUBLIC_ADMOB_BANNER_IOS=ca-app-pub-XXXXXXXX/XXXXXXXXXX
+ *
+ * LANGKAH 4 — Aktifkan kode nyata di bawah
+ *   1. Install package:
+ *      pnpm --filter @workspace/mobile add react-native-google-mobile-ads
+ *   2. Uncomment blok "PRODUCTION CODE" di bawah
+ *   3. Comment blok "MOCK CODE" di bawah
+ *   4. Build ulang dengan EAS: eas build --platform android
+ *
+ * CATATAN PENTING:
+ *   • Iklan TIDAK bisa tampil di Expo Go — harus EAS Build / APK
+ *   • Gunakan TestIds.BANNER saat __DEV__ agar tidak melanggar kebijakan AdMob
+ *   • Proses review AdMob bisa 1–7 hari setelah app tayang di store
+ */
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -9,16 +58,39 @@ import {
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
+// ─── ID Unit Iklan ────────────────────────────────────────────────────────────
+// Isi setelah dapat dari AdMob Console (Langkah 2)
+const BANNER_ANDROID = process.env.EXPO_PUBLIC_ADMOB_BANNER_ANDROID ?? "";
+const BANNER_IOS     = process.env.EXPO_PUBLIC_ADMOB_BANNER_IOS ?? "";
+const BANNER_UNIT_ID = Platform.OS === "ios" ? BANNER_IOS : BANNER_ANDROID;
+
+// Set true kalau sudah install react-native-google-mobile-ads & dapat ID
+const ADS_ENABLED = false;
+
 // ─────────────────────────────────────────────────────────────────────────────
-// AdBanner — Mock AdMob Banner
+// PRODUCTION CODE (uncomment saat ADS_ENABLED = true)
+// ─────────────────────────────────────────────────────────────────────────────
 //
-// Di production (APK/AAB), ganti komponen ini dengan react-native-google-mobile-ads:
-//   import { BannerAd, BannerAdSize, TestIds } from "react-native-google-mobile-ads";
-//   const adUnitId = __DEV__ ? TestIds.BANNER : "ca-app-pub-XXXX/YYYY";
-//   <BannerAd unitId={adUnitId} size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER} />
+// import {
+//   BannerAd,
+//   BannerAdSize,
+//   TestIds,
+// } from "react-native-google-mobile-ads";
 //
-// Unit ID production didapat dari Google AdMob Console:
-//   https://admob.google.com/
+// const adUnitId = __DEV__ ? TestIds.BANNER : BANNER_UNIT_ID;
+//
+// function RealBannerAd() {
+//   return (
+//     <BannerAd
+//       unitId={adUnitId}
+//       size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+//       requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+//     />
+//   );
+// }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// MOCK CODE (hapus/comment saat sudah pakai production code)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MOCK_ADS = [
@@ -27,12 +99,7 @@ const MOCK_ADS = [
   { label: "Raih target belajarmu hari ini", cta: "Lihat Tips", color: "#059669" },
 ];
 
-interface AdBannerProps {
-  size?: "banner" | "largeBanner" | "mediumRectangle";
-  style?: object;
-}
-
-export function AdBanner({ size = "banner", style }: AdBannerProps) {
+function MockBannerAd({ size = "banner" }: { size?: string }) {
   const [adIndex, setAdIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
 
@@ -49,35 +116,17 @@ export function AdBanner({ size = "banner", style }: AdBannerProps) {
   const bannerHeight = size === "banner" ? 50 : size === "largeBanner" ? 100 : 250;
 
   return (
-    <View
-      style={[
-        styles.container,
-        { height: bannerHeight },
-        size === "mediumRectangle" && styles.mrec,
-        style,
-      ]}
-    >
-      {/* AdMob-style badge */}
+    <View style={[styles.container, { height: bannerHeight }, size === "mediumRectangle" && styles.mrec]}>
       <View style={styles.badge}>
         <Text style={styles.badgeText}>Ad</Text>
       </View>
-
-      {/* Ad Content */}
       <View style={styles.content}>
         <Feather name="zap" size={14} color={ad.color} style={{ marginRight: 6 }} />
         <Text style={styles.adText} numberOfLines={1}>{ad.label}</Text>
       </View>
-
-      {/* CTA */}
-      <TouchableOpacity
-        style={[styles.ctaBtn, { borderColor: ad.color }]}
-        activeOpacity={0.75}
-        onPress={() => {}}
-      >
+      <TouchableOpacity style={[styles.ctaBtn, { borderColor: ad.color }]} activeOpacity={0.75}>
         <Text style={[styles.ctaText, { color: ad.color }]}>{ad.cta}</Text>
       </TouchableOpacity>
-
-      {/* Dismiss */}
       <TouchableOpacity
         onPress={() => setDismissed(true)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -86,6 +135,30 @@ export function AdBanner({ size = "banner", style }: AdBannerProps) {
       >
         <Feather name="x" size={12} color={Colors.textMuted} />
       </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Export utama — otomatis beralih antara mock dan real
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AdBannerProps {
+  size?: "banner" | "largeBanner" | "mediumRectangle";
+  style?: object;
+}
+
+export function AdBanner({ size = "banner", style }: AdBannerProps) {
+  // Web tidak mendukung AdMob
+  if (Platform.OS === "web") return null;
+
+  // Kalau ADS_ENABLED = true dan ada ID → pakai iklan nyata
+  // if (ADS_ENABLED && BANNER_UNIT_ID) return <RealBannerAd />;
+
+  // Default: tampilkan mock
+  return (
+    <View style={style}>
+      <MockBannerAd size={size} />
     </View>
   );
 }
