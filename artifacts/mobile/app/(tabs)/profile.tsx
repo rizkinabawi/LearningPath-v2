@@ -11,13 +11,14 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import {
   getUser, getStats, getLearningPaths, clearAllData,
-  exportCourse, importCourse,
-  type User as UserType, type Stats,
+  importCourse,
+  type User as UserType, type Stats, type CoursePack,
 } from "@/utils/storage";
 import {
   getReminderSettings, saveReminderSettings, scheduleStudyReminder, cancelStudyReminder,
   type ReminderSettings,
 } from "@/utils/notifications";
+import { CourseBundleShareModal, CourseImportPreviewModal } from "@/components/CourseBundleModal";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
 
 export default function ProfileTab() {
@@ -28,6 +29,9 @@ export default function ProfileTab() {
   const [pathCount, setPathCount] = useState(0);
   const [importing, setImporting] = useState(false);
   const [reminder, setReminder] = useState<ReminderSettings>({ enabled: false, hour: 19, minute: 0 });
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showImportPreview, setShowImportPreview] = useState(false);
+  const [importPreviewPack, setImportPreviewPack] = useState<CoursePack | null>(null);
 
   useFocusEffect(useCallback(() => {
     (async () => {
@@ -63,44 +67,40 @@ export default function ProfileTab() {
     if (next.enabled) await scheduleStudyReminder(next.hour, next.minute);
   };
 
-  const handleExportCourse = async () => {
+  const handleImportCourse = async () => {
     try {
-      const pack = await exportCourse();
-      const json = JSON.stringify(pack, null, 2);
-      if (Platform.OS === "web") {
-        const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = `course-pack-${Date.now()}.json`; a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        const fileUri = FileSystem.cacheDirectory + `course-pack-${Date.now()}.json`;
-        await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
-        await Share.share({ url: fileUri, message: "Course Pack dari Mobile Learning" });
+      const result = await DocumentPicker.getDocumentAsync({ type: ["application/json", "*/*"], copyToCacheDirectory: true });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const text = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+      const pack = JSON.parse(text);
+      if (!pack.version || !Array.isArray(pack.paths) || pack.paths.length === 0) {
+        Alert.alert("Format Tidak Valid", "File bukan bundle kursus yang valid. Pastikan file dibuat dari fitur 'Bagikan Bundle Kursus'.");
+        return;
       }
-    } catch (e) {
-      Alert.alert("Export Gagal", "Terjadi kesalahan saat mengekspor kursus.");
+      setImportPreviewPack(pack as CoursePack);
+      setShowImportPreview(true);
+    } catch {
+      Alert.alert("Gagal Membaca File", "Tidak dapat membaca file. Pastikan format JSON valid.");
     }
   };
 
-  const handleImportCourse = async () => {
+  const handleConfirmImport = async () => {
+    if (!importPreviewPack) return;
+    setImporting(true);
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: "application/json", copyToCacheDirectory: true });
-      if (result.canceled) return;
-      const asset = result.assets[0];
-      setImporting(true);
-      const text = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
-      const pack = JSON.parse(text);
-      if (!pack.version || !pack.paths) {
-        Alert.alert("Format Tidak Valid", "File bukan course pack yang valid.");
-        setImporting(false); return;
-      }
-      const count = await importCourse(pack);
+      const count = await importCourse(importPreviewPack);
       const paths = await getLearningPaths();
       setPathCount(paths.length);
-      Alert.alert("Import Berhasil", `${count} item berhasil diimport!`);
+      setShowImportPreview(false);
+      setImportPreviewPack(null);
+      Alert.alert(
+        "🎉 Import Berhasil!",
+        `${count} item berhasil diimport!\n\nKursus, modul, pelajaran, flashcard, dan quiz kini tersedia di akunmu. Selamat belajar!`,
+        [{ text: "Mulai Belajar", style: "default" }]
+      );
     } catch {
-      Alert.alert("Import Gagal", "Gagal membaca file. Pastikan format file benar.");
+      Alert.alert("Import Gagal", "Terjadi kesalahan saat mengimport. Coba lagi.");
     } finally {
       setImporting(false);
     }
@@ -112,14 +112,14 @@ export default function ProfileTab() {
 
   const MENU = [
     {
-      icon: "download" as const, label: "Export Kursus",
-      sub: "Simpan semua kursus ke file JSON",
+      icon: "share-2" as const, label: "Bagikan Bundle Kursus",
+      sub: "Pilih kursus & bagikan ke teman",
       color: Colors.teal,
-      onPress: handleExportCourse,
+      onPress: () => setShowShareModal(true),
     },
     {
-      icon: "upload" as const, label: "Import Kursus",
-      sub: "Muat kursus dari file JSON",
+      icon: "download" as const, label: "Import Bundle Kursus",
+      sub: "Muat kursus dari file bundle teman",
       color: Colors.primary,
       onPress: handleImportCourse,
     },
@@ -152,6 +152,7 @@ export default function ProfileTab() {
   const initial = (user?.name ?? "L").charAt(0).toUpperCase();
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={styles.root} showsVerticalScrollIndicator={false}>
       {/* ── HEADER ── */}
       <LinearGradient
@@ -358,6 +359,22 @@ export default function ProfileTab() {
         <Text style={styles.footer}>Mobile Learning · v1.0</Text>
       </View>
     </ScrollView>
+
+    {/* ── SHARE BUNDLE MODAL ── */}
+    <CourseBundleShareModal
+      visible={showShareModal}
+      onClose={() => setShowShareModal(false)}
+    />
+
+    {/* ── IMPORT PREVIEW MODAL ── */}
+    <CourseImportPreviewModal
+      visible={showImportPreview}
+      pack={importPreviewPack}
+      importing={importing}
+      onConfirm={handleConfirmImport}
+      onCancel={() => { setShowImportPreview(false); setImportPreviewPack(null); }}
+    />
+    </View>
   );
 }
 
