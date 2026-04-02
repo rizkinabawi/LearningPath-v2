@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, Platform, Share,
-  ActivityIndicator,
+  ActivityIndicator, Switch,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -14,6 +14,10 @@ import {
   exportCourse, importCourse,
   type User as UserType, type Stats,
 } from "@/utils/storage";
+import {
+  getReminderSettings, saveReminderSettings, scheduleStudyReminder, cancelStudyReminder,
+  type ReminderSettings,
+} from "@/utils/notifications";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
 
 export default function ProfileTab() {
@@ -23,13 +27,41 @@ export default function ProfileTab() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [pathCount, setPathCount] = useState(0);
   const [importing, setImporting] = useState(false);
+  const [reminder, setReminder] = useState<ReminderSettings>({ enabled: false, hour: 19, minute: 0 });
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [u, s, paths] = await Promise.all([getUser(), getStats(), getLearningPaths()]);
-      setUser(u); setStats(s); setPathCount(paths.length);
+      const [u, s, paths, rem] = await Promise.all([getUser(), getStats(), getLearningPaths(), getReminderSettings()]);
+      setUser(u); setStats(s); setPathCount(paths.length); setReminder(rem);
     })();
   }, []));
+
+  const handleToggleReminder = async (val: boolean) => {
+    const next = { ...reminder, enabled: val };
+    setReminder(next);
+    await saveReminderSettings(next);
+    if (val) {
+      await scheduleStudyReminder(next.hour, next.minute);
+    } else {
+      await cancelStudyReminder();
+    }
+  };
+
+  const cycleHour = async (dir: 1 | -1) => {
+    const next = { ...reminder, hour: (reminder.hour + dir + 24) % 24 };
+    setReminder(next);
+    await saveReminderSettings(next);
+    if (next.enabled) await scheduleStudyReminder(next.hour, next.minute);
+  };
+  const cycleMinute = async (dir: 1 | -1) => {
+    const options = [0, 15, 30, 45];
+    const idx = options.indexOf(reminder.minute);
+    const nextIdx = (idx + dir + options.length) % options.length;
+    const next = { ...reminder, minute: options[nextIdx] };
+    setReminder(next);
+    await saveReminderSettings(next);
+    if (next.enabled) await scheduleStudyReminder(next.hour, next.minute);
+  };
 
   const handleExportCourse = async () => {
     try {
@@ -232,6 +264,69 @@ export default function ProfileTab() {
           </TouchableOpacity>
         </View>
 
+        {/* Pengingat Belajar */}
+        <Text style={styles.menuLabel}>Pengingat Belajar</Text>
+        <View style={[styles.reminderCard, shadowSm]}>
+          <View style={styles.reminderRow}>
+            <View style={[styles.menuIconWrap, { backgroundColor: Colors.primaryLight }]}>
+              <Feather name="bell" size={18} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.menuTitle}>Aktifkan Pengingat</Text>
+              <Text style={styles.menuSub}>
+                {reminder.enabled
+                  ? `Notifikasi setiap hari pukul ${String(reminder.hour).padStart(2, "0")}:${String(reminder.minute).padStart(2, "0")}`
+                  : "Pengingat belajar harian dimatikan"}
+              </Text>
+            </View>
+            <Switch
+              value={reminder.enabled}
+              onValueChange={handleToggleReminder}
+              trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+              thumbColor={reminder.enabled ? Colors.primary : Colors.textMuted}
+            />
+          </View>
+
+          {reminder.enabled && (
+            <>
+              <View style={styles.reminderDivider} />
+              <View style={styles.timePickerRow}>
+                <Text style={styles.timePickerLabel}>Jam Pengingat</Text>
+                <View style={styles.timePicker}>
+                  <TouchableOpacity style={styles.timeArrow} onPress={() => cycleHour(-1)}>
+                    <Feather name="chevron-left" size={18} color={Colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={styles.timeVal}>{String(reminder.hour).padStart(2, "0")}</Text>
+                  <Text style={styles.timeSep}>:</Text>
+                  <Text style={styles.timeVal}>{String(reminder.minute).padStart(2, "0")}</Text>
+                  <TouchableOpacity style={styles.timeArrow} onPress={() => cycleHour(1)}>
+                    <Feather name="chevron-right" size={18} color={Colors.primary} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.minuteRow}>
+                  {[0, 15, 30, 45].map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      style={[styles.minuteChip, reminder.minute === m && styles.minuteChipActive]}
+                      onPress={() => cycleMinute([0, 15, 30, 45].indexOf(m) - [0, 15, 30, 45].indexOf(reminder.minute))}
+                    >
+                      <Text style={[styles.minuteChipText, reminder.minute === m && styles.minuteChipTextActive]}>
+                        :{String(m).padStart(2, "0")}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <View style={[styles.reminderHint, { backgroundColor: Colors.primaryLight }]}>
+                <Feather name="info" size={12} color={Colors.primary} />
+                <Text style={[styles.reminderHintText, { color: Colors.primary }]}>
+                  Notifikasi motivasi harian juga aktif setiap jam 08:00
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
+
         {/* Settings menu */}
         <Text style={styles.menuLabel}>Pengaturan</Text>
         {importing && (
@@ -315,4 +410,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12,
   },
   importingText: { fontSize: 14, fontWeight: "700", color: Colors.primary },
+
+  // Reminder
+  reminderCard: {
+    backgroundColor: Colors.white, borderRadius: 20, overflow: "hidden",
+    paddingTop: 4, paddingBottom: 4,
+  },
+  reminderRow: {
+    flexDirection: "row", alignItems: "center", padding: 16, gap: 14,
+  },
+  reminderDivider: { height: 1, backgroundColor: Colors.borderLight, marginHorizontal: 16 },
+  timePickerRow: { padding: 16, gap: 12 },
+  timePickerLabel: {
+    fontSize: 11, fontWeight: "800", color: Colors.textMuted,
+    textTransform: "uppercase", letterSpacing: 1,
+  },
+  timePicker: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, backgroundColor: Colors.background, borderRadius: 16, padding: 14,
+  },
+  timeVal: { fontSize: 32, fontWeight: "900", color: Colors.dark, minWidth: 52, textAlign: "center" },
+  timeSep: { fontSize: 28, fontWeight: "900", color: Colors.textMuted },
+  timeArrow: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: Colors.white, alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
+  minuteRow: { flexDirection: "row", gap: 8 },
+  minuteChip: {
+    flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: "center",
+    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.white,
+  },
+  minuteChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  minuteChipText: { fontSize: 13, fontWeight: "700", color: Colors.textMuted },
+  minuteChipTextActive: { color: Colors.white },
+  reminderHint: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    margin: 12, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  reminderHintText: { fontSize: 12, fontWeight: "600", flex: 1, lineHeight: 17 },
 });

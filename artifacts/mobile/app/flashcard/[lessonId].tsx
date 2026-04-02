@@ -24,6 +24,7 @@ import {
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
+import { AchievementPopup } from "@/components/AchievementPopup";
 
 export default function FlashcardScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
@@ -36,6 +37,8 @@ export default function FlashcardScreen() {
   const [completed, setCompleted] = useState<Record<string, "correct" | "wrong">>({});
   const [done, setDone] = useState(false);
   const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
+  const [showAchievement, setShowAchievement] = useState(false);
+  const [achievementValue, setAchievementValue] = useState(0);
 
   const [flipAnim] = useState(new Animated.Value(0));
 
@@ -90,7 +93,10 @@ export default function FlashcardScreen() {
       flipAnim.setValue(0);
       setCurrentIndex((i) => i + 1);
     } else {
+      const correctCount = Object.values({ ...completed, [cards[currentIndex].id]: correct ? "correct" : "wrong" }).filter((v) => v === "correct").length;
+      setAchievementValue(correctCount);
       setDone(true);
+      setTimeout(() => setShowAchievement(true), 400);
     }
   };
 
@@ -160,6 +166,12 @@ export default function FlashcardScreen() {
             <Text style={styles.nextLessonArrow}>→</Text>
           </TouchableOpacity>
         )}
+        <AchievementPopup
+          visible={showAchievement}
+          type="flashcard_done"
+          value={achievementValue}
+          onClose={() => setShowAchievement(false)}
+        />
       </View>
     );
   }

@@ -24,6 +24,7 @@ import {
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
+import { AchievementPopup } from "@/components/AchievementPopup";
 
 export default function QuizScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
@@ -37,6 +38,8 @@ export default function QuizScreen() {
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
   const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
+  const [showAchievement, setShowAchievement] = useState(false);
+  const [achievementValue, setAchievementValue] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -88,7 +91,11 @@ export default function QuizScreen() {
       setSelectedOption(null);
       setIsAnswered(false);
     } else {
+      const finalScore = score + (isAnswered && quizzes[currentIndex]?.options[selectedOption ?? -1] === quizzes[currentIndex]?.answer ? 0 : 0);
+      const pct = Math.round((score / quizzes.length) * 100);
+      setAchievementValue(pct);
       setDone(true);
+      setTimeout(() => setShowAchievement(true), 400);
     }
   };
 
@@ -157,6 +164,12 @@ export default function QuizScreen() {
             <Text style={styles.nextLessonArrow}>→</Text>
           </TouchableOpacity>
         )}
+        <AchievementPopup
+          visible={showAchievement}
+          type={achievementValue >= 100 ? "quiz_perfect" : "quiz_done"}
+          value={achievementValue}
+          onClose={() => setShowAchievement(false)}
+        />
       </View>
     );
   }

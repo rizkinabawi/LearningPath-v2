@@ -14,6 +14,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ToastContainer } from "@/components/Toast";
+import { scheduleDailyMotivation, getReminderSettings, scheduleStudyReminder } from "@/utils/notifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,6 +60,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
+      scheduleDailyMotivation().catch(() => {});
+      getReminderSettings().then((s) => {
+        if (s.enabled) scheduleStudyReminder(s.hour, s.minute).catch(() => {});
+      });
     }
   }, [fontsLoaded, fontError]);
 
