@@ -1,6 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
+/** Special lessonId for flashcards/quizzes created without a course */
+export const STANDALONE_LESSON_ID = "__standalone__";
+
 // Types
 export interface User {
   id: string;

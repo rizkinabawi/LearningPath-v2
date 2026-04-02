@@ -6,6 +6,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import {
   getLearningPaths, getModules, getLessons, saveQuiz, generateId,
+  STANDALONE_LESSON_ID,
   type LearningPath, type Module, type Lesson, type Quiz,
 } from "@/utils/storage";
 import Colors, { shadowSm } from "@/constants/colors";
@@ -66,8 +67,6 @@ export function QuickAddQuizModal({ visible, onClose, onSaved }: Props) {
 
   const handleSave = async () => {
     if (!question.trim()) { toast.error("Pertanyaan wajib diisi"); return; }
-    if (!selLesson) { toast.error("Pilih pelajaran terlebih dahulu"); return; }
-
     let finalOptions: string[] = [];
     let finalAnswer = "";
 
@@ -87,14 +86,14 @@ export function QuickAddQuizModal({ visible, onClose, onSaved }: Props) {
     setSaving(true);
     try {
       const quiz: Quiz = {
-        id: generateId(), lessonId: selLesson.id,
+        id: generateId(), lessonId: selLesson?.id ?? STANDALONE_LESSON_ID,
         question: question.trim(), options: finalOptions,
         answer: finalAnswer, type: quizType,
         explanation: explanation.trim() || undefined,
         createdAt: new Date().toISOString(),
       };
       await saveQuiz(quiz);
-      toast.success("Soal berhasil ditambahkan!");
+      toast.success(selLesson ? "Soal berhasil ditambahkan!" : "Soal disimpan ke Koleksi Pribadi!");
       onSaved();
       onClose();
     } catch (e: any) {
@@ -124,7 +123,7 @@ export function QuickAddQuizModal({ visible, onClose, onSaved }: Props) {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
 
               {/* Lesson Picker */}
-              <Text style={s.label}>Pelajaran Tujuan *</Text>
+              <Text style={s.label}>Assign ke Pelajaran <Text style={s.optional}>(opsional — bisa diisi nanti)</Text></Text>
               <TouchableOpacity
                 style={[s.pickerBtn, selLesson ? s.pickerBtnActive : null]}
                 onPress={() => setPickerStep("course")}
@@ -135,6 +134,12 @@ export function QuickAddQuizModal({ visible, onClose, onSaved }: Props) {
                 </Text>
                 <Feather name="chevron-right" size={16} color={Colors.textMuted} />
               </TouchableOpacity>
+              {!selLesson && (
+                <View style={s.standaloneBadge}>
+                  <Feather name="user" size={12} color={Colors.textMuted} />
+                  <Text style={s.standaloneBadgeText}>Akan masuk ke Koleksi Pribadi kamu</Text>
+                </View>
+              )}
 
               {/* Quiz type toggle */}
               <Text style={[s.label, { marginTop: 16 }]}>Tipe Soal</Text>
@@ -374,6 +379,13 @@ const s = StyleSheet.create({
   tfTrue: { backgroundColor: Colors.success, borderColor: Colors.success },
   tfFalse: { backgroundColor: Colors.danger, borderColor: Colors.danger },
   tfBtnText: { fontSize: 15, fontWeight: "800", color: Colors.textMuted },
+  optional: { fontSize: 11, fontWeight: "500", color: Colors.textMuted },
+  standaloneBadge: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: Colors.border, alignSelf: "flex-start",
+  },
+  standaloneBadgeText: { fontSize: 11, fontWeight: "600", color: Colors.textMuted },
   saveBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
     backgroundColor: Colors.danger, borderRadius: 16, paddingVertical: 15, marginTop: 16,

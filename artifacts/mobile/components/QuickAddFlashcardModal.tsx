@@ -8,6 +8,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "@/utils/fs-compat";
 import {
   getLearningPaths, getModules, getLessons, saveFlashcard, generateId,
+  STANDALONE_LESSON_ID,
   type LearningPath, type Module, type Lesson, type Flashcard,
 } from "@/utils/storage";
 import Colors, { shadowSm } from "@/constants/colors";
@@ -75,7 +76,6 @@ export function QuickAddFlashcardModal({ visible, onClose, onSaved }: Props) {
 
   const handleSave = async () => {
     if (!question.trim() || !answer.trim()) { toast.error("Pertanyaan dan jawaban wajib diisi"); return; }
-    if (!selLesson) { toast.error("Pilih pelajaran terlebih dahulu"); return; }
     setSaving(true);
     try {
       const id = generateId();
@@ -91,12 +91,13 @@ export function QuickAddFlashcardModal({ visible, onClose, onSaved }: Props) {
       } else if (imageUri) { savedImage = imageUri; }
 
       const card: Flashcard = {
-        id, lessonId: selLesson.id,
+        id,
+        lessonId: selLesson?.id ?? STANDALONE_LESSON_ID,
         question: question.trim(), answer: answer.trim(), tag: tag.trim(),
         image: savedImage, createdAt: new Date().toISOString(),
       };
       await saveFlashcard(card);
-      toast.success("Flashcard berhasil ditambahkan!");
+      toast.success(selLesson ? "Flashcard berhasil ditambahkan!" : "Flashcard disimpan ke Koleksi Pribadi!");
       onSaved();
       onClose();
     } catch (e: any) {
@@ -126,7 +127,7 @@ export function QuickAddFlashcardModal({ visible, onClose, onSaved }: Props) {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
 
               {/* Lesson Picker */}
-              <Text style={s.label}>Pelajaran Tujuan *</Text>
+              <Text style={s.label}>Assign ke Pelajaran <Text style={s.optional}>(opsional — bisa diisi nanti)</Text></Text>
               <TouchableOpacity
                 style={[s.pickerBtn, selLesson ? s.pickerBtnActive : null]}
                 onPress={() => setPickerStep("course")}
@@ -137,6 +138,12 @@ export function QuickAddFlashcardModal({ visible, onClose, onSaved }: Props) {
                 </Text>
                 <Feather name="chevron-right" size={16} color={Colors.textMuted} />
               </TouchableOpacity>
+              {!selLesson && (
+                <View style={s.standaloneBadge}>
+                  <Feather name="user" size={12} color={Colors.textMuted} />
+                  <Text style={s.standaloneBadgeText}>Akan masuk ke Koleksi Pribadi kamu</Text>
+                </View>
+              )}
 
               {/* Form */}
               <Text style={[s.label, { marginTop: 16 }]}>Pertanyaan / Depan Kartu *</Text>
@@ -305,6 +312,13 @@ const s = StyleSheet.create({
   imgPreviewWrap: { position: "relative", alignSelf: "flex-start", marginBottom: 4 },
   imgPreview: { width: 100, height: 75, borderRadius: 10 },
   imgRemove: { position: "absolute", top: 4, right: 4, backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 10, padding: 3 },
+  optional: { fontSize: 11, fontWeight: "500", color: Colors.textMuted },
+  standaloneBadge: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: Colors.border, alignSelf: "flex-start",
+  },
+  standaloneBadgeText: { fontSize: 11, fontWeight: "600", color: Colors.textMuted },
   saveBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
     backgroundColor: Colors.primary, borderRadius: 16, paddingVertical: 15, marginTop: 16,
