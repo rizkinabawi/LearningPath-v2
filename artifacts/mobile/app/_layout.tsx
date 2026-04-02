@@ -254,6 +254,10 @@ function RootLayoutNav() {
         name="course/[pathId]"
         options={{ headerShown: false, animation: "slide_from_right" }}
       />
+      <Stack.Screen
+        name="about-developer"
+        options={{ headerShown: false, animation: "slide_from_right" }}
+      />
     </Stack>
   );
 }

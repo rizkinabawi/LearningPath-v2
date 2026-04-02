@@ -146,6 +146,12 @@ export default function ProfileTab() {
       },
     },
     {
+      icon: "code" as const, label: t.profile.about_dev,
+      sub: t.profile.about_dev_sub,
+      color: "#7C47FF",
+      onPress: () => router.push("/about-developer"),
+    },
+    {
       icon: "refresh-cw" as const, label: t.profile.reset_profile,
       sub: t.profile.reset_profile_sub,
       color: Colors.amber,

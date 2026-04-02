@@ -226,6 +226,8 @@ const translations = {
       reminder_toggle: "Aktifkan Pengingat",
       lang_id: "Indonesia",
       lang_en: "English",
+      about_dev: "Tentang Developer",
+      about_dev_sub: "Kenalan dengan pembuat aplikasi",
     },
 
     // ── Flashcard player ─────────────────────────────────────────────────────
@@ -661,6 +663,8 @@ const translations = {
       reminder_toggle: "Enable Reminder",
       lang_id: "Indonesia",
       lang_en: "English",
+      about_dev: "About Developer",
+      about_dev_sub: "Meet the person behind this app",
     },
 
     // ── Flashcard player ─────────────────────────────────────────────────────
