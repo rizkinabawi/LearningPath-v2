@@ -255,41 +255,62 @@ export default function CreateQuizScreen() {
 
       const validItems = parseValidQuizItems(rawItems);
       if (validItems.length === 0) {
-        Alert.alert("Tidak Ada Data", "Tidak ada soal valid.");
+        Alert.alert(
+          "Tidak Ada Soal Valid",
+          'Tidak ada soal valid ditemukan.\n\nPastikan format JSON:\n' +
+          '[{"question":"...","options":[...],"correct_answer":"...","explanation":"..."}]\n\n' +
+          'Field "correct_answer" harus identik dengan salah satu opsi.'
+        );
         return;
       }
-      setPendingImportItems(validItems);
-      setShowPackModal(true);
+      // If packs exist → let user pick; otherwise save directly
+      if (packs.length > 0) {
+        setPendingImportItems(validItems);
+        setShowPackModal(true);
+      } else {
+        await doImport(validItems, undefined);
+      }
     } catch {
-      Alert.alert("JSON Tidak Valid", 'Format: [{"question":"...","options":[...],"answer":"..."}]');
+      Alert.alert(
+        "JSON Tidak Valid",
+        'Format yang didukung:\n\n[{"question":"...","options":[...],"correct_answer":"...","explanation":"..."}]\n\nPastikan hasil dari AI sudah disalin lengkap.'
+      );
     }
   };
 
-  const doImportToPack = async (packId: string) => {
-    let count = 0;
-    for (const item of pendingImportItems) {
-      const options: string[] = item.options.map(String);
-      const answerRaw = String(item.correct_answer ?? item.answer ?? "").trim();
-      let answer = answerRaw;
-      const exactMatch = options.find((o) => o === answerRaw);
-      if (!exactMatch) {
-        const letterMatch = answerRaw.match(/^([A-Da-d])[\.\):\s]/);
-        if (letterMatch) {
-          const idx = "abcd".indexOf(letterMatch[1].toLowerCase());
-          if (idx >= 0 && options[idx]) answer = options[idx];
-        } else {
-          const partial = options.find((o) =>
+  const resolveAnswer = (item: any) => {
+    const options: string[] = (item.options ?? []).map(String);
+    const answerRaw = String(item.correct_answer ?? item.answer ?? "").trim();
+    let answer = answerRaw;
+    const exactMatch = options.find((o) => o === answerRaw);
+    if (!exactMatch) {
+      const letterMatch = answerRaw.match(/^([A-Da-d])[\.\):\s]/);
+      if (letterMatch) {
+        const idx = "abcd".indexOf(letterMatch[1].toLowerCase());
+        if (idx >= 0 && options[idx]) answer = options[idx];
+      } else {
+        const partial = options.find(
+          (o) =>
             o.toLowerCase().includes(answerRaw.toLowerCase()) ||
             answerRaw.toLowerCase().includes(o.toLowerCase())
-          );
-          if (partial) answer = partial;
-        }
+        );
+        if (partial) answer = partial;
       }
+    }
+    return { options, answer };
+  };
+
+  const doImport = async (items: any[], packId: string | undefined) => {
+    let count = 0;
+    for (const item of items) {
+      if (!item.question || !Array.isArray(item.options)) continue;
+      const { options, answer } = resolveAnswer(item);
+      if (!answer) continue;
       const quiz: Quiz = {
         id: generateId(),
         lessonId: lessonId ?? "",
         packId,
-        question: String(item.question),
+        question: String(item.question).trim(),
         options,
         answer,
         type: "multiple-choice",
@@ -304,7 +325,15 @@ export default function CreateQuizScreen() {
     setShowImport(false);
     setShowPackModal(false);
     setNewPackName("");
-    toast.success(`${count} soal berhasil diimport!`);
+    if (count > 0) {
+      toast.success(`${count} soal berhasil diimport!`);
+    } else {
+      toast.error("Tidak ada soal yang berhasil disimpan.");
+    }
+  };
+
+  const doImportToPack = async (packId: string) => {
+    await doImport(pendingImportItems, packId);
   };
 
   const handleCreatePackAndImport = async () => {

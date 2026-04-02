@@ -226,33 +226,44 @@ export default function CreateFlashcardScreen() {
       );
 
       if (validItems.length === 0) {
-        Alert.alert("Tidak Ada Data", "Tidak ada item yang valid ditemukan.");
+        Alert.alert(
+          "Tidak Ada Data",
+          "Tidak ada flashcard valid ditemukan.\n\nPastikan format JSON:\n" +
+          '[{"question":"...","answer":"...","tag":"..."}]'
+        );
         return;
       }
 
-      setPendingImportItems(validItems);
-      setShowPackModal(true);
+      // If packs exist → let user pick a pack; otherwise save directly
+      if (packs.length > 0) {
+        setPendingImportItems(validItems);
+        setShowPackModal(true);
+      } else {
+        // Save directly without a pack
+        await doImport(validItems, undefined);
+      }
     } catch {
       Alert.alert(
         "JSON Tidak Valid",
-        'Format yang didukung:\n\n1. Flat array (disarankan):\n[{"question":"...","answer":"...","tag":"..."}]\n\n2. Wrapped format:\n{"items":[{"question":"...","answer":"..."}]}'
+        'Format yang didukung:\n\n[{"question":"...","answer":"...","tag":"..."}]\n\nPastikan hasil dari AI sudah disalin lengkap.'
       );
     }
   };
 
-  const doImportToPack = async (packId: string) => {
+  const doImport = async (items: any[], packId: string | undefined) => {
     let count = 0;
-    for (const item of pendingImportItems) {
-      const question = item.question ?? item.front ?? "";
-      const answer = item.answer ?? item.back ?? "";
-      const tag = item.tag ?? "";
+    for (const item of items) {
+      const q = item.question ?? item.front ?? "";
+      const a = item.answer ?? item.back ?? "";
+      const t = item.tag ?? "";
+      if (!String(q).trim()) continue;
       const card: Flashcard = {
         id: generateId(),
         lessonId: lessonId ?? "",
         packId,
-        question: String(question),
-        answer: String(answer),
-        tag: String(tag),
+        question: String(q).trim(),
+        answer: String(a).trim(),
+        tag: String(t).trim(),
         createdAt: new Date().toISOString(),
       };
       await saveFlashcard(card);
@@ -264,7 +275,15 @@ export default function CreateFlashcardScreen() {
     setShowImport(false);
     setShowPackModal(false);
     setNewPackName("");
-    toast.success(`${count} flashcard berhasil diimport!`);
+    if (count > 0) {
+      toast.success(`${count} flashcard berhasil diimport!`);
+    } else {
+      toast.error("Tidak ada flashcard yang berhasil disimpan.");
+    }
+  };
+
+  const doImportToPack = async (packId: string) => {
+    await doImport(pendingImportItems, packId);
   };
 
   const handleCreatePackAndImport = async () => {
