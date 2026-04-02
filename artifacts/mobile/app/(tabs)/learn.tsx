@@ -119,8 +119,22 @@ export default function LearnPage() {
     if (sharingId) return;
     setSharingId(p.id);
     try {
-      const rawPack = await exportCourse(p.id);
-      const pack = await embedAssetsInPack(rawPack);
+      // 1. Export course data
+      let rawPack;
+      try {
+        rawPack = await exportCourse(p.id);
+      } catch (e: any) {
+        throw new Error(`Export gagal: ${e?.message ?? String(e)}`);
+      }
+
+      // 2. Embed assets (with fallback — skip embed if it throws)
+      let pack = rawPack;
+      try {
+        pack = await embedAssetsInPack(rawPack);
+      } catch {
+        // non-fatal — share without embedded assets
+      }
+
       const json = JSON.stringify(pack);
       const slug = p.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
       const filename = `bundle-${slug}-${Date.now()}.json`;
@@ -140,10 +154,19 @@ export default function LearnPage() {
         URL.revokeObjectURL(url);
         toast.success("Bundle berhasil diunduh!");
       } else {
-        const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
-        await FileSystem.writeAsStringAsync(fileUri, json, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
+        // 3. Write file to cache
+        const cacheDir = FileSystem.cacheDirectory;
+        if (!cacheDir) throw new Error("Cache directory tidak tersedia.");
+        const fileUri = cacheDir + filename;
+        try {
+          await FileSystem.writeAsStringAsync(fileUri, json, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+        } catch (e: any) {
+          throw new Error(`Tulis file gagal: ${e?.message ?? String(e)}`);
+        }
+
+        // 4. Share
         const assetMsg = assetSummary ? ` Termasuk ${assetSummary}.` : "";
         const shared = await safeShareFile(fileUri, {
           mimeType: "application/json",
@@ -151,17 +174,16 @@ export default function LearnPage() {
           UTI: "public.json",
         });
         if (shared) {
-          toast.success(
-            `Bundle "${p.name}" siap dibagikan!${assetMsg}`
-          );
+          toast.success(`Bundle "${p.name}" siap dibagikan!${assetMsg}`);
         } else {
           toast.info("Berbagi dibatalkan.");
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       if (!isCancellationError(e)) {
-        console.warn("[LearnPage] share error", e);
-        toast.error("Gagal membuat bundle. Coba lagi.");
+        const msg = e?.message ?? String(e);
+        console.warn("[LearnPage] share error", msg);
+        toast.error(`Gagal: ${msg}`);
       }
     } finally {
       setSharingId(null);

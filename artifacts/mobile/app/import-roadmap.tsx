@@ -339,21 +339,7 @@ export default function ImportRoadmapScreen() {
   };
 
   // ── Save to storage ─────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (!preview) return;
-
-    const confirmed = await new Promise<boolean>((res) =>
-      Alert.alert(
-        "Buat Struktur Kursus?",
-        `Akan dibuat:\n• 1 kursus: "${preview.courseName}"\n• ${preview.totalModules} modul\n• ${preview.totalLessons} pelajaran\n• ${preview.totalMaterials} materi\n\nLanjutkan?`,
-        [
-          { text: "Batal", style: "cancel", onPress: () => res(false) },
-          { text: "Buat Sekarang", style: "default", onPress: () => res(true) },
-        ]
-      )
-    );
-    if (!confirmed) return;
-
+  const doSave = async () => {
     setSaving(true);
     try {
       const data = parseRoadmap(jsonText);
@@ -479,10 +465,22 @@ export default function ImportRoadmapScreen() {
       router.back();
     } catch (e: any) {
       console.warn("[ImportRoadmap] save error", e);
-      toast.error("Gagal menyimpan. Coba lagi.");
+      toast.error(`Gagal menyimpan: ${e?.message ?? "Coba lagi."}`);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = () => {
+    if (!preview || saving) return;
+    Alert.alert(
+      "Buat Struktur Kursus?",
+      `Akan dibuat:\n• 1 kursus: "${preview.courseName}"\n• ${preview.totalModules} modul\n• ${preview.totalLessons} pelajaran\n• ${preview.totalMaterials} materi\n\nLanjutkan?`,
+      [
+        { text: "Batal", style: "cancel" },
+        { text: "Buat Sekarang", style: "default", onPress: doSave },
+      ]
+    );
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────

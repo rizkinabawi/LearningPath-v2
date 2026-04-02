@@ -22,6 +22,7 @@ import {
   X,
   Plus,
   Trash2,
+  PencilLine,
   ChevronDown,
   ChevronUp,
   FileText,
@@ -261,6 +262,24 @@ export default function StudyMaterialScreen() {
     setPickedFile(null);
     setPickedImage(null);
     setActiveTab("text");
+    setShowModal(true);
+  };
+
+  const openEdit = (mat: StudyMaterial) => {
+    setEditMat(mat);
+    setMatTitle(mat.title);
+    // youtube materials from import may store URL in videoUrl instead of content
+    const urlContent = mat.type === "youtube" ? (mat.videoUrl || mat.content) : mat.content;
+    setMatContent(urlContent);
+    setPickedFile(
+      mat.type === "file" && mat.filePath
+        ? { name: mat.fileName ?? "file", uri: mat.filePath, size: mat.fileSize, mimeType: mat.fileMime }
+        : null
+    );
+    setPickedImage(
+      mat.type === "image" && mat.filePath ? mat.filePath : null
+    );
+    setActiveTab(mat.type as any);
     setShowModal(true);
   };
 
@@ -522,6 +541,13 @@ export default function StudyMaterialScreen() {
                   </View>
                   <View style={styles.matActions}>
                     <TouchableOpacity
+                      onPress={() => { openEdit(mat); }}
+                      style={[styles.iconBtn, styles.iconBtnEdit]}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <PencilLine size={13} color={Colors.purple} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       onPress={() => handleDelete(mat)}
                       style={[styles.iconBtn, styles.iconBtnDanger]}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -592,7 +618,7 @@ export default function StudyMaterialScreen() {
                     )}
 
                     {mat.type === "youtube" && (
-                      <YoutubeEmbed url={mat.content} />
+                      <YoutubeEmbed url={mat.videoUrl || mat.content} />
                     )}
 
                     {mat.type === "googledoc" && (
@@ -645,7 +671,7 @@ export default function StudyMaterialScreen() {
             ]}
           >
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>{t.common.add} {t.common.material}</Text>
+            <Text style={styles.modalTitle}>{editMat ? "Edit Materi" : `${t.common.add} ${t.common.material}`}</Text>
 
             <ScrollView
               keyboardShouldPersistTaps="handled"
@@ -901,6 +927,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   iconBtnDanger: { backgroundColor: Colors.dangerLight },
+  iconBtnEdit: { backgroundColor: "#EDE9FE" },
   matBody: {
     borderTopWidth: 1, borderTopColor: Colors.border,
     padding: 14, backgroundColor: Colors.background,
