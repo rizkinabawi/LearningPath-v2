@@ -217,7 +217,13 @@ export const PromptBuilder = () => {
       return;
     }
     try {
-      const raw = JSON.parse(jsonInput.trim());
+      // Strip markdown code fences that AI tools often add (```json ... ```)
+      const cleanedInput = jsonInput
+        .trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      const raw = JSON.parse(cleanedInput);
 
       // Normalisasi ke format LearningJsonOutput
       let result: LearningJsonOutput;

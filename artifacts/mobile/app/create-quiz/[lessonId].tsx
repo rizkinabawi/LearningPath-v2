@@ -197,7 +197,13 @@ export default function CreateQuizScreen() {
 
   const handleImportJson = async () => {
     try {
-      const parsed = JSON.parse(importJson);
+      // Strip markdown code fences that AI tools often add (```json ... ```)
+      const cleaned = importJson
+        .trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      const parsed = JSON.parse(cleaned);
 
       // Normalisasi: terima flat array ATAU wrapped {type, items}
       let rawItems: any[] = [];
