@@ -62,15 +62,36 @@ const saveImageToLocal = async (uri: string, id: string): Promise<string> => {
   return dest;
 };
 
-const buildAIPrompt = (topic: string, count: number, difficulty: string) => {
+const QUIZ_LANG_LABELS: Record<string, string> = {
+  "Bahasa Indonesia": "Bahasa Indonesia",
+  "English": "English",
+  "Japanese": "Japanese (日本語)",
+  "Mandarin": "Mandarin (中文)",
+  "Arabic": "Arabic (العربية)",
+  "French": "French (Français)",
+  "German": "German (Deutsch)",
+  "Korean": "Korean (한국어)",
+};
+
+const buildAIPrompt = (
+  topic: string,
+  count: number,
+  difficulty: string,
+  language: string = "Bahasa Indonesia",
+  customNote: string = ""
+) => {
   const diffLabel =
     difficulty === "easy"
       ? "mudah (untuk pemula)"
       : difficulty === "hard"
       ? "sulit (level lanjut)"
       : "sedang (level menengah)";
+  const langLabel = QUIZ_LANG_LABELS[language] ?? language;
+  const noteSection = customNote.trim()
+    ? `\nCatatan tambahan: ${customNote.trim()}`
+    : "";
 
-  return `Buatkan ${count} soal pilihan ganda tentang "${topic}" dengan tingkat kesulitan ${diffLabel}.
+  return `Buatkan ${count} soal pilihan ganda tentang "${topic}" dengan tingkat kesulitan ${diffLabel}. Gunakan bahasa ${langLabel}.${noteSection}
 
 PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode (\`\`\`). Langsung mulai dengan tanda [ dan akhiri dengan ].
 
@@ -84,18 +105,20 @@ Format JSON yang WAJIB digunakan (contoh):
       "Membuat komponen baru",
       "Menghapus elemen dari DOM"
     ],
-    "answer": "Mengelola side effects setelah render"
+    "correct_answer": "Mengelola side effects setelah render",
+    "explanation": "useEffect dijalankan setelah setiap render dan digunakan untuk side effects seperti fetching data, subscription, atau manipulasi DOM."
   }
 ]
 
 ATURAN WAJIB — wajib diikuti untuk setiap soal:
-1. Field "question": string berisi pertanyaan
-2. Field "options": array berisi TEPAT 4 string pilihan jawaban (teks lengkap, bukan huruf A/B/C/D)
-3. Field "answer": string yang IDENTIK SAMA PERSIS (huruf, spasi, tanda baca) dengan salah satu elemen di array "options"
-4. JANGAN gunakan "A", "B", "C", "D" sebagai nilai "answer" — gunakan teks lengkap opsinya
-5. Tidak ada field lain selain "question", "options", "answer"
-6. Gunakan Bahasa Indonesia
-7. Topik: ${topic}`;
+1. Field "question": string berisi pertanyaan yang jelas
+2. Field "options": array berisi TEPAT 4 string pilihan jawaban (teks lengkap, BUKAN huruf A/B/C/D)
+3. Field "correct_answer": string yang IDENTIK SAMA PERSIS (huruf, spasi, tanda baca) dengan salah satu elemen di array "options"
+4. Field "explanation": string penjelasan singkat mengapa jawaban tersebut benar
+5. JANGAN gunakan "A", "B", "C", "D" sebagai nilai "correct_answer" — gunakan teks lengkap opsinya
+6. Tidak ada field lain selain "question", "options", "correct_answer", "explanation"
+7. Minimum ${Math.max(count, 5)} soal
+8. Topik: ${topic}`;
 };
 
 export default function CreateQuizScreen() {
@@ -124,6 +147,8 @@ export default function CreateQuizScreen() {
   const [promptTopic, setPromptTopic] = useState("");
   const [promptCount, setPromptCount] = useState("10");
   const [promptDifficulty, setPromptDifficulty] = useState("medium");
+  const [promptLanguage, setPromptLanguage] = useState("Bahasa Indonesia");
+  const [promptCustomNote, setPromptCustomNote] = useState("");
   const [promptCopied, setPromptCopied] = useState(false);
   const [generatedPrompt, setGeneratedPrompt] = useState("");
 
@@ -210,7 +235,12 @@ export default function CreateQuizScreen() {
   };
 
   const parseValidQuizItems = (rawItems: any[]) => {
-    return rawItems.filter((item) => item.question && Array.isArray(item.options) && item.answer);
+    return rawItems.filter(
+      (item) =>
+        item.question &&
+        Array.isArray(item.options) &&
+        (item.correct_answer || item.answer)
+    );
   };
 
   const handleImportJson = async () => {
@@ -239,7 +269,7 @@ export default function CreateQuizScreen() {
     let count = 0;
     for (const item of pendingImportItems) {
       const options: string[] = item.options.map(String);
-      const answerRaw = String(item.answer).trim();
+      const answerRaw = String(item.correct_answer ?? item.answer ?? "").trim();
       let answer = answerRaw;
       const exactMatch = options.find((o) => o === answerRaw);
       if (!exactMatch) {
@@ -311,7 +341,7 @@ export default function CreateQuizScreen() {
       return;
     }
     const count = parseInt(promptCount) || 10;
-    const prompt = buildAIPrompt(promptTopic.trim(), count, promptDifficulty);
+    const prompt = buildAIPrompt(promptTopic.trim(), count, promptDifficulty, promptLanguage, promptCustomNote);
     setGeneratedPrompt(prompt);
     await Clipboard.setStringAsync(prompt);
     setPromptCopied(true);
@@ -515,6 +545,42 @@ export default function CreateQuizScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Bahasa Soal</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 4 }}>
+              {Object.entries(QUIZ_LANG_LABELS).map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.diffBtn,
+                    promptLanguage === key && styles.diffBtnActive,
+                    { paddingHorizontal: 10 },
+                  ]}
+                  onPress={() => setPromptLanguage(key)}
+                >
+                  <Text
+                    style={[
+                      styles.diffBtnText,
+                      promptLanguage === key && styles.diffBtnTextActive,
+                      { fontSize: 12 },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Catatan Tambahan (opsional)</Text>
+            <TextInput
+              value={promptCustomNote}
+              onChangeText={setPromptCustomNote}
+              placeholder="Contoh: Fokus pada konsep X, buat soal kontekstual, dll."
+              style={[styles.aiInput, { minHeight: 60, textAlignVertical: "top" }]}
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              numberOfLines={3}
+            />
 
             {/* Copy Prompt Button */}
             <TouchableOpacity

@@ -48,15 +48,36 @@ const saveImageToLocal = async (uri: string, id: string): Promise<string> => {
   return dest;
 };
 
-const buildFlashcardPrompt = (topic: string, count: number, difficulty: string) => {
+const FC_LANG_LABELS: Record<string, string> = {
+  "Bahasa Indonesia": "Bahasa Indonesia",
+  "English": "English",
+  "Japanese": "Japanese (日本語)",
+  "Mandarin": "Mandarin (中文)",
+  "Arabic": "Arabic (العربية)",
+  "French": "French (Français)",
+  "German": "German (Deutsch)",
+  "Korean": "Korean (한국어)",
+};
+
+const buildFlashcardPrompt = (
+  topic: string,
+  count: number,
+  difficulty: string,
+  language: string = "Bahasa Indonesia",
+  customNote: string = ""
+) => {
   const diffLabel =
     difficulty === "easy"
       ? "mudah (untuk pemula)"
       : difficulty === "hard"
       ? "sulit (level lanjut)"
       : "sedang (level menengah)";
+  const langLabel = FC_LANG_LABELS[language] ?? language;
+  const noteSection = customNote.trim()
+    ? `\nCatatan tambahan: ${customNote.trim()}`
+    : "";
 
-  return `Buatkan ${count} flashcard belajar tentang "${topic}" dengan tingkat kesulitan ${diffLabel}.
+  return `Buatkan ${count} flashcard belajar tentang "${topic}" dengan tingkat kesulitan ${diffLabel}. Gunakan bahasa ${langLabel}.${noteSection}
 
 PENTING: Balas HANYA dengan array JSON murni. Jangan tambahkan teks, penjelasan, markdown, atau blok kode (\`\`\`). Langsung mulai dengan tanda [ dan akhiri dengan ].
 
@@ -74,8 +95,8 @@ ATURAN WAJIB — wajib diikuti untuk setiap kartu:
 2. Field "answer": string berisi jawaban lengkap dan jelas (boleh beberapa kalimat)
 3. Field "tag": string kata kunci singkat tanpa spasi (gunakan tanda hubung jika perlu, contoh: "reaksi-kimia", "hukum-newton")
 4. Tidak ada field lain selain "question", "answer", "tag"
-5. Gunakan Bahasa Indonesia
-6. Jawaban harus informatif dan edukatif, bukan sekadar satu kata
+5. Jawaban harus informatif dan edukatif, bukan sekadar satu kata
+6. Minimum ${Math.max(count, 3)} kartu
 7. Topik: ${topic}`;
 };
 
@@ -105,6 +126,8 @@ export default function CreateFlashcardScreen() {
   const [promptTopic, setPromptTopic] = useState("");
   const [promptCount, setPromptCount] = useState("10");
   const [promptDifficulty, setPromptDifficulty] = useState("medium");
+  const [promptLanguage, setPromptLanguage] = useState("Bahasa Indonesia");
+  const [promptCustomNote, setPromptCustomNote] = useState("");
   const [promptCopied, setPromptCopied] = useState(false);
   const [generatedPrompt, setGeneratedPrompt] = useState("");
 
@@ -278,7 +301,7 @@ export default function CreateFlashcardScreen() {
       return;
     }
     const count = parseInt(promptCount) || 10;
-    const prompt = buildFlashcardPrompt(promptTopic.trim(), count, promptDifficulty);
+    const prompt = buildFlashcardPrompt(promptTopic.trim(), count, promptDifficulty, promptLanguage, promptCustomNote);
     setGeneratedPrompt(prompt);
     await Clipboard.setStringAsync(prompt);
     setPromptCopied(true);
@@ -472,6 +495,32 @@ export default function CreateFlashcardScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Bahasa Kartu</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 4 }}>
+              {Object.entries(FC_LANG_LABELS).map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.diffBtn, promptLanguage === key && styles.diffBtnActive, { paddingHorizontal: 10 }]}
+                  onPress={() => setPromptLanguage(key)}
+                >
+                  <Text style={[styles.diffBtnText, promptLanguage === key && styles.diffBtnTextActive, { fontSize: 12 }]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Catatan Tambahan (opsional)</Text>
+            <TextInput
+              value={promptCustomNote}
+              onChangeText={setPromptCustomNote}
+              placeholder="Contoh: Fokus pada kosakata teknis, sertakan contoh kalimat, dll."
+              style={[styles.aiInput, { minHeight: 60, textAlignVertical: "top" }]}
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              numberOfLines={3}
+            />
 
             {/* Format reminder */}
             <View style={styles.formatBox}>

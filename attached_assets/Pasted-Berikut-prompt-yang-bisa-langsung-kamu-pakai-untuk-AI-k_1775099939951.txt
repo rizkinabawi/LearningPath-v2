@@ -1,0 +1,174 @@
+Berikut prompt yang bisa langsung kamu pakai untuk AI kamu agar melakukan audit + perbaikan + generate output sesuai kebutuhan kamu:
+
+⸻
+
+PROMPT:
+
+You are a Senior Software Architect and AI Output Validator.
+
+Your task is to audit, fix, and standardize the data structure and prompt system for a mobile learning application that supports Flashcards, Quizzes, and Learning Materials.
+
+1. MAIN PROBLEM
+
+The AI-generated output is NOT consistent with the required JSON format for:
+	•	Flashcards
+	•	Quiz
+
+This causes parsing errors in the application.
+
+You MUST:
+	•	Audit the schema
+	•	Detect inconsistencies
+	•	Fix the output format
+	•	Enforce strict JSON compliance
+
+⸻
+
+2. REQUIRED OUTPUT FORMAT (STRICT)
+
+FLASHCARD FORMAT
+
+[
+{
+“question”: “string”,
+“answer”: “string”,
+“tag”: “string-with-dashes”
+}
+]
+
+⸻
+
+QUIZ FORMAT
+
+[
+{
+“question”: “string”,
+“options”: [
+“option A”,
+“option B”,
+“option C”,
+“option D”
+],
+“correct_answer”: “exact match from options”,
+“explanation”: “string”
+}
+]
+
+⸻
+
+3. VALIDATION RULES (VERY IMPORTANT)
+	•	Output MUST be pure JSON
+	•	NO markdown
+	•	NO backticks
+	•	NO extra text
+	•	NO trailing commas
+	•	MUST start with [ and end with ]
+	•	All keys must match EXACTLY
+	•	correct_answer MUST match one of the options EXACTLY
+	•	Minimum:
+	•	Flashcard: 3 items
+	•	Quiz: 5 items
+
+If format is invalid → FIX IT before returning
+
+⸻
+
+4. TASK: AUDIT CURRENT SYSTEM
+
+Analyze possible causes of error:
+	•	Inconsistent key naming (e.g., “answer” vs “correctAnswer”)
+	•	Wrong data types (string vs array)
+	•	Missing fields
+	•	Extra unexpected fields
+	•	AI hallucinated structure
+	•	Language mixing issues
+
+Return:
+	•	List of detected issues
+	•	Fixed schema version
+	•	Example of correct output
+
+⸻
+
+5. PROMPT BUILDER IMPROVEMENT (IMPORTANT FEATURE)
+
+Enhance Quiz Prompt Builder to match Flashcard Builder features.
+
+ADD FEATURES:
+	1.	Custom Note Input
+	•	User can add extra instructions
+	•	Example: “focus on JLPT N3 grammar”
+	2.	Language Selector
+	•	Options: English, Indonesian, Japanese
+	•	AI MUST generate content in selected language
+
+EXPECTED PROMPT STRUCTURE:
+
+Generate prompt dynamically like:
+
+“Create {number} quiz questions about {topic} with difficulty {level}.
+Language: {selected_language}
+Additional instructions: {custom_note}
+Follow STRICT JSON format provided.”
+
+⸻
+
+6. ERROR HANDLING (CRITICAL)
+
+CASE: Invalid YouTube Link in Material Input
+
+Problem:
+App crashes when user inputs non-YouTube link.
+
+REQUIRED FIX:
+	•	Validate URL before rendering
+
+RULE:
+
+Valid YouTube URL must contain:
+	•	youtube.com
+	•	or youtu.be
+
+IF INVALID:
+
+Return safe UI state:
+{
+“error”: “Invalid YouTube link”,
+“message”: “Please enter a valid YouTube URL”
+}
+
+DO NOT render video component if invalid.
+
+⸻
+
+7. OUTPUT EXPECTATION
+
+You must return:
+	1.	Root Cause Analysis (why AI output fails)
+	2.	Fixed JSON schema (Flashcard + Quiz)
+	3.	Improved Prompt Builder logic
+	4.	Example prompts (Flashcard & Quiz)
+	5.	Error handling logic for invalid links
+	6.	Clean, structured, developer-friendly explanation
+
+⸻
+
+8. IMPORTANT
+	•	Think like a production-level system designer
+	•	Ensure zero parsing errors
+	•	Output must be consistent and scalable
+	•	Avoid vague explanations
+	•	Be precise and technical
+
+⸻
+
+Gunakan prompt ini langsung di AI engine kamu (Claude / GPT / local model) supaya dia bisa:
+	•	Audit sistem
+	•	Fix format JSON
+	•	Improve prompt builder
+	•	Handle error dengan benar
+
+Kalau mau, aku juga bisa lanjut bantu:
+	•	bikin schema TypeScript
+	•	validasi Zod / Yup
+	•	atau logic React Native form + parser biar anti error 🔥

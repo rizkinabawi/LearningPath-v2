@@ -18,6 +18,30 @@ export const LANGUAGE_OPTIONS = [
   { id: "Korean", label: "🇰🇷 Korean" },
 ];
 
+// Canonical quiz format reminder (used in multiple templates)
+const QUIZ_FORMAT_EXAMPLE = `[
+  {
+    "question": "Apa fungsi utama mitokondria dalam sel?",
+    "options": [
+      "Menghasilkan energi (ATP) melalui respirasi seluler",
+      "Menyimpan informasi genetik",
+      "Mengontrol masuk keluarnya zat dari sel",
+      "Mensintesis protein"
+    ],
+    "correct_answer": "Menghasilkan energi (ATP) melalui respirasi seluler",
+    "explanation": "Mitokondria dikenal sebagai 'powerhouse of the cell' karena menghasilkan ATP melalui proses respirasi seluler."
+  }
+]`;
+
+const QUIZ_RULES = `ATURAN WAJIB — wajib diikuti untuk setiap soal:
+1. Field "question": string pertanyaan yang jelas
+2. Field "options": array TEPAT 4 string (teks lengkap, BUKAN huruf A/B/C/D)
+3. Field "correct_answer": string yang IDENTIK SAMA PERSIS (huruf, spasi, tanda baca) dengan salah satu elemen di "options"
+4. Field "explanation": string penjelasan singkat mengapa jawaban tersebut benar
+5. JANGAN gunakan "A", "B", "C", "D" sebagai nilai "correct_answer" — gunakan teks lengkap
+6. Tidak ada field lain selain "question", "options", "correct_answer", "explanation"
+7. Minimum 5 soal`;
+
 export const PROMPT_TEMPLATES: PromptTemplate[] = [
   // ── FLASHCARD TEMPLATES ──────────────────────────────────────
   {
@@ -46,7 +70,8 @@ ATURAN WAJIB:
 2. Field "answer": jawaban lengkap dan informatif
 3. Field "tag": kata kunci singkat dengan tanda hubung
 4. Hanya field "question", "answer", "tag"
-5. Topik: [TOPIC]`,
+5. Minimum 3 item
+6. Topik: [TOPIC]`,
   },
   {
     id: "fc-vocab",
@@ -69,7 +94,7 @@ Format JSON yang WAJIB digunakan:
   }
 ]
 
-ATURAN: Hanya field "question", "answer", "tag". Topik: [TOPIC]`,
+ATURAN: Hanya field "question", "answer", "tag". Minimum 3 item. Topik: [TOPIC]`,
   },
   {
     id: "fc-dates",
@@ -91,7 +116,7 @@ Format JSON:
   }
 ]
 
-ATURAN: Hanya field "question", "answer", "tag". Topik: [TOPIC]`,
+ATURAN: Hanya field "question", "answer", "tag". Minimum 3 item. Topik: [TOPIC]`,
   },
   {
     id: "fc-formula",
@@ -113,7 +138,7 @@ Format JSON:
   }
 ]
 
-ATURAN: Hanya field "question", "answer", "tag". Topik: [TOPIC]`,
+ATURAN: Hanya field "question", "answer", "tag". Minimum 3 item. Topik: [TOPIC]`,
   },
 
   // ── QUIZ TEMPLATES ───────────────────────────────────────────
@@ -122,32 +147,17 @@ ATURAN: Hanya field "question", "answer", "tag". Topik: [TOPIC]`,
     topic: "Umum",
     type: "quiz",
     title: "Pilihan Ganda",
-    description: "Quiz pilihan ganda dengan 4 opsi",
+    description: "Quiz pilihan ganda dengan 4 opsi + penjelasan",
     template: `Buatkan 10 soal pilihan ganda tentang [TOPIC] untuk level [LEVEL]. Gunakan bahasa [LANGUAGE].
 [CUSTOM_NOTE]
 
 PENTING: Balas HANYA dengan array JSON murni. Langsung mulai dengan [ dan akhiri dengan ].
 
 Format JSON yang WAJIB digunakan:
-[
-  {
-    "question": "Apa fungsi utama mitokondria dalam sel?",
-    "options": [
-      "Menghasilkan energi (ATP) melalui respirasi seluler",
-      "Menyimpan informasi genetik",
-      "Mengontrol masuk keluarnya zat dari sel",
-      "Mensintesis protein"
-    ],
-    "answer": "Menghasilkan energi (ATP) melalui respirasi seluler"
-  }
-]
+${QUIZ_FORMAT_EXAMPLE}
 
-ATURAN WAJIB:
-1. Field "question": string pertanyaan
-2. Field "options": array TEPAT 4 string (teks lengkap, bukan huruf A/B/C/D)
-3. Field "answer": string IDENTIK SAMA PERSIS dengan salah satu elemen "options"
-4. Hanya field "question", "options", "answer"
-5. Topik: [TOPIC]`,
+${QUIZ_RULES}
+8. Topik: [TOPIC]`,
   },
   {
     id: "qz-truefalse",
@@ -165,11 +175,12 @@ Format JSON:
   {
     "question": "Matahari berputar mengelilingi Bumi.",
     "options": ["Benar", "Salah"],
-    "answer": "Salah"
+    "correct_answer": "Salah",
+    "explanation": "Bumi yang mengelilingi Matahari, bukan sebaliknya."
   }
 ]
 
-ATURAN: "options" harus ["Benar","Salah"]. "answer" identik salah satu opsi. Topik: [TOPIC]`,
+ATURAN: "options" harus ["Benar","Salah"]. "correct_answer" identik salah satu opsi. Sertakan "explanation". Minimum 5 item. Topik: [TOPIC]`,
   },
   {
     id: "qz-math",
@@ -188,11 +199,12 @@ Format JSON:
   {
     "question": "Berapakah hasil dari 15 × 12?",
     "options": ["180", "170", "175", "165"],
-    "answer": "180"
+    "correct_answer": "180",
+    "explanation": "15 × 12 = 15 × 10 + 15 × 2 = 150 + 30 = 180."
   }
 ]
 
-ATURAN: "options" TEPAT 4 string. "answer" identik salah satu opsi. Topik: [TOPIC]`,
+ATURAN: "options" TEPAT 4 string. "correct_answer" identik salah satu opsi. Sertakan "explanation". Minimum 5 item. Topik: [TOPIC]`,
   },
   {
     id: "qz-reading",
@@ -215,11 +227,12 @@ Format JSON:
       "Menyerap air dari tanah",
       "Menghasilkan karbon dioksida"
     ],
-    "answer": "Mengubah energi cahaya menjadi energi kimia berupa glukosa"
+    "correct_answer": "Mengubah energi cahaya menjadi energi kimia berupa glukosa",
+    "explanation": "Fotosintesis mengubah energi cahaya matahari menjadi glukosa yang disimpan sebagai energi kimia."
   }
 ]
 
-ATURAN: "options" TEPAT 4 string. "answer" identik salah satu opsi. Topik: [TOPIC]`,
+ATURAN: "options" TEPAT 4 string. "correct_answer" identik salah satu opsi. Sertakan "explanation". Minimum 5 item. Topik: [TOPIC]`,
   },
 ];
 

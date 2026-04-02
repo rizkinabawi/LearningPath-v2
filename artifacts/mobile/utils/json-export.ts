@@ -3,17 +3,24 @@ import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
+// ─── Canonical AI output types (these match the format AI is asked to produce) ─
+
+/**
+ * QuizItem — format yang diminta ke AI dan yang ditampilkan sebagai contoh ke user.
+ * Gunakan `correct_answer` (bukan `answer`) sesuai spesifikasi output.
+ * Field `explanation` wajib ada agar AI memberikan penjelasan jawaban.
+ */
 export interface QuizItem {
   question: string;
   options: string[];
-  answer: string;
+  correct_answer: string;
   explanation?: string;
   image?: string;
 }
 
-// Flashcard menggunakan question/answer/tag — SAMA PERSIS dengan format AI output
-// Format flat array (rekomendasi): [{"question":"...","answer":"...","tag":"..."}]
-// Format wrapped: {"type":"flashcard","topic":"...","items":[{"question":"...","answer":"...","tag":"..."}]}
+/**
+ * FlashcardItem — format standar flashcard.
+ */
 export interface FlashcardItem {
   question: string;
   answer: string;
@@ -37,6 +44,16 @@ export interface FlashcardJsonOutput {
 
 export type LearningJsonOutput = QuizJsonOutput | FlashcardJsonOutput;
 
+// ─── Normalisasi item quiz dari AI output ke storage format ─────────────────
+/**
+ * Normalisasi satu item quiz dari format AI (correct_answer) ke storage (answer).
+ * Mendukung kedua format untuk backward-compatibility.
+ */
+export function normalizeQuizAnswer(item: any): string {
+  return String(item.correct_answer ?? item.answer ?? "").trim();
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
 export async function copyJsonToClipboard(data: LearningJsonOutput): Promise<void> {
   const json = JSON.stringify(data, null, 2);
   await Clipboard.setStringAsync(json);

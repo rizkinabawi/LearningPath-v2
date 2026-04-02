@@ -150,6 +150,7 @@ export const PromptBuilder = () => {
             items: [
               { question: `Contoh pertanyaan tentang ${topic}?`, answer: "Jawaban lengkap dan informatif di sini.", tag: "contoh-tag" },
               { question: `Konsep utama ${topic}`, answer: "Penjelasan singkat dan padat tentang konsep ini.", tag: "konsep-inti" },
+              { question: `Definisi penting ${topic}`, answer: "Definisi yang jelas dan mudah dipahami.", tag: "definisi" },
             ],
           }
         : {
@@ -160,7 +161,14 @@ export const PromptBuilder = () => {
               {
                 question: `Soal contoh tentang ${topic}?`,
                 options: ["Jawaban yang benar", "Pilihan salah B", "Pilihan salah C", "Pilihan salah D"],
-                answer: "Jawaban yang benar",
+                correct_answer: "Jawaban yang benar",
+                explanation: "Penjelasan singkat mengapa jawaban ini benar.",
+              },
+              {
+                question: `Pertanyaan lanjutan tentang ${topic}?`,
+                options: ["Opsi A yang salah", "Opsi B yang benar", "Opsi C yang salah", "Opsi D yang salah"],
+                correct_answer: "Opsi B yang benar",
+                explanation: "Penjelasan kenapa Opsi B adalah jawaban yang tepat.",
               },
             ],
           };
@@ -242,7 +250,8 @@ export const PromptBuilder = () => {
             items: raw.map((item: any) => ({
               question: item.question ?? "",
               options: Array.isArray(item.options) ? item.options.map(String) : [],
-              answer: item.answer ?? "",
+              correct_answer: item.correct_answer ?? item.answer ?? "",
+              explanation: item.explanation ?? "",
             })),
           };
         } else {
@@ -272,7 +281,8 @@ export const PromptBuilder = () => {
           return {
             question: item.question ?? "",
             options: Array.isArray(item.options) ? item.options.map(String) : [],
-            answer: item.answer ?? "",
+            correct_answer: item.correct_answer ?? item.answer ?? "",
+            explanation: item.explanation ?? "",
           };
         });
         if (isQuizWrapped) {

@@ -201,6 +201,14 @@ export default function StudyMaterialScreen() {
     const isUrlType = urlTypes.includes(activeTab as any);
 
     if (isUrlType && !matContent.trim()) { toast.error("Masukkan URL"); return; }
+    if (activeTab === "youtube") {
+      const url = matContent.trim().toLowerCase();
+      const isValidYoutube = url.includes("youtube.com") || url.includes("youtu.be");
+      if (!isValidYoutube) {
+        toast.error("URL tidak valid. Gunakan link YouTube (youtube.com atau youtu.be)");
+        return;
+      }
+    }
     if (activeTab === "text" && !matContent.trim()) { toast.error("Isi konten materi"); return; }
     if (activeTab === "html" && !matContent.trim()) { toast.error("Isi konten HTML"); return; }
     if (activeTab === "file" && !pickedFile) { toast.error("Pilih file terlebih dahulu"); return; }
