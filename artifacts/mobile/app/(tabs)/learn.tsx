@@ -186,15 +186,26 @@ export default function LearnPage() {
             <Text style={styles.headerSub}>{t.learn.header_sub}</Text>
             <Text style={styles.headerTitle}>{t.learn.header_title}</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => setShowNewPath(true)}
-            style={styles.addBtn}
-            activeOpacity={0.8}
-          >
-            <LinearGradient colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]} style={styles.addGrad}>
-              <Feather name="plus" size={22} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => router.push("/import-roadmap")}
+              style={styles.addBtn}
+              activeOpacity={0.8}
+            >
+              <LinearGradient colors={["rgba(255,255,255,0.25)", "rgba(255,255,255,0.1)"]} style={styles.addGrad}>
+                <Feather name="download" size={19} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowNewPath(true)}
+              style={styles.addBtn}
+              activeOpacity={0.8}
+            >
+              <LinearGradient colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]} style={styles.addGrad}>
+                <Feather name="plus" size={22} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
         {paths.length > 0 && (
           <Text style={styles.headerCount}>{t.learn.courses_available(paths.length)}</Text>
@@ -212,20 +223,34 @@ export default function LearnPage() {
       >
         {paths.length === 0 ? (
           /* Empty state */
-          <TouchableOpacity onPress={() => setShowNewPath(true)} activeOpacity={0.85}>
-            <LinearGradient
-              colors={["#4A9EFF", "#6C63FF"]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.emptyCard}
+          <View style={{ gap: 12 }}>
+            <TouchableOpacity onPress={() => setShowNewPath(true)} activeOpacity={0.85}>
+              <LinearGradient
+                colors={["#4A9EFF", "#6C63FF"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.emptyCard}
+              >
+                <View style={styles.hdot1} /><View style={styles.hdot2} />
+                <View style={styles.emptyIconWrap}>
+                  <Feather name="plus-circle" size={40} color="rgba(255,255,255,0.9)" />
+                </View>
+                <Text style={styles.emptyTitle}>{t.learn.empty_title}</Text>
+                <Text style={styles.emptySub}>Tap untuk membuat jalur belajarmu sendiri</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/import-roadmap")}
+              activeOpacity={0.85}
+              style={styles.importRoadmapCard}
             >
-              <View style={styles.hdot1} /><View style={styles.hdot2} />
-              <View style={styles.emptyIconWrap}>
-                <Feather name="plus-circle" size={40} color="rgba(255,255,255,0.9)" />
+              <Feather name="download" size={22} color={Colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.importRoadmapTitle}>Import dari Roadmap JSON</Text>
+                <Text style={styles.importRoadmapSub}>Generate dengan AI lalu import otomatis</Text>
               </View>
-              <Text style={styles.emptyTitle}>{t.learn.empty_title}</Text>
-              <Text style={styles.emptySub}>Tap untuk membuat jalur belajarmu sendiri</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <Feather name="chevron-right" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={isTablet ? styles.tabletGrid : undefined}>
             {paths.map((p, idx) => {
@@ -385,6 +410,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 20, fontWeight: "900", color: "#fff" },
   emptySub: { fontSize: 13, color: "rgba(255,255,255,0.7)", fontWeight: "500", textAlign: "center" },
+  importRoadmapCard: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    backgroundColor: Colors.white, borderRadius: 18,
+    borderWidth: 1.5, borderColor: Colors.primaryLight,
+    paddingVertical: 16, paddingHorizontal: 18,
+  },
+  importRoadmapTitle: { fontSize: 14, fontWeight: "800", color: Colors.dark },
+  importRoadmapSub: { fontSize: 12, color: Colors.textMuted, fontWeight: "500", marginTop: 2 },
 
   courseCard: { borderRadius: 22, overflow: "hidden", marginBottom: 4 },
   courseCardTablet: { width: "48.5%", marginBottom: 0 },
