@@ -32,6 +32,7 @@ Aplikasi belajar mobile (Expo React Native) dari repo https://github.com/rizkina
 10. **Mistakes Review** — review ulang jawaban yang salah
 11. **Progress Dashboard** — statistik, streak, akurasi, difficulty classifier
 12. **Report Generator** — export laporan belajar
+13. **UI Language Switching** — toggle Indonesian/English via `contexts/LanguageContext.tsx` + `utils/i18n.ts`; persisted in AsyncStorage; toggle di tab Profile
 
 ## File Structure (Mobile)
 ```

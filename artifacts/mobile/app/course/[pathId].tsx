@@ -24,6 +24,7 @@ import {
   type LearningPath, type Module, type Lesson,
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const GRAD_PALETTE: [string, string][] = [
   ["#4A9EFF", "#6C63FF"],
@@ -49,6 +50,7 @@ export default function CourseDetailPage() {
   const [counts, setCounts] = useState<Record<string, ModCounts>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
+  const { t } = useTranslation();
   const [showNewModule, setShowNewModule] = useState(false);
   const [showNewLesson, setShowNewLesson] = useState(false);
   const [modName, setModName] = useState("");
@@ -112,22 +114,22 @@ export default function CourseDetailPage() {
 
   const handleDeleteModule = (mod: Module) => {
     Alert.alert(
-      "Hapus Modul",
-      `Hapus "${mod.name}"? Semua pelajaran, flashcard, quiz, dan materi di dalamnya akan ikut terhapus.`,
+      t.course.delete_mod_title,
+      t.course.delete_mod_msg(mod.name),
       [
-        { text: "Batal", style: "cancel" },
-        { text: "Hapus", style: "destructive", onPress: async () => { await deleteModule(mod.id); loadData(); } },
+        { text: t.common.cancel, style: "cancel" },
+        { text: t.common.delete, style: "destructive", onPress: async () => { await deleteModule(mod.id); loadData(); } },
       ]
     );
   };
 
   const handleDeleteLesson = (lesson: Lesson) => {
     Alert.alert(
-      "Hapus Pelajaran",
-      `Hapus "${lesson.name}"? Flashcard, quiz, catatan, dan materi di dalamnya akan ikut terhapus.`,
+      t.course.delete_lesson_title,
+      t.course.delete_lesson_msg(lesson.name),
       [
-        { text: "Batal", style: "cancel" },
-        { text: "Hapus", style: "destructive", onPress: async () => { await deleteLesson(lesson.id); loadData(); } },
+        { text: t.common.cancel, style: "cancel" },
+        { text: t.common.delete, style: "destructive", onPress: async () => { await deleteLesson(lesson.id); loadData(); } },
       ]
     );
   };
@@ -156,7 +158,7 @@ export default function CourseDetailPage() {
             <Feather name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.headerSub}>KURSUS</Text>
+            <Text style={styles.headerSub}>{t.course.header_sub}</Text>
             <Text style={styles.headerTitle} numberOfLines={1}>{path?.name ?? "..."}</Text>
           </View>
           <TouchableOpacity
@@ -190,7 +192,7 @@ export default function CourseDetailPage() {
             activeOpacity={0.8}
           >
             <Feather name="plus-circle" size={18} color={Colors.primary} />
-            <Text style={styles.emptyModText}>Tambah Modul Pertama</Text>
+            <Text style={styles.emptyModText}>{t.course.empty_mod}</Text>
           </TouchableOpacity>
         )}
 
@@ -218,11 +220,11 @@ export default function CourseDetailPage() {
                     <Text style={styles.moduleName} numberOfLines={1}>{mod.name}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       <View style={styles.moduleMetaRow}>
-                        <MetaChip label={`${modLessons.length} Pelajaran`} />
-                        <MetaChip label={`${cnt.fc} Kartu`} />
-                        <MetaChip label={`${cnt.qz} Quiz`} />
-                        <MetaChip label={`${cnt.nt} Catatan`} color={Colors.primary} bg="#EEF0FF" />
-                        <MetaChip label={`${cnt.mt} Materi`} color={Colors.purple} bg={Colors.purpleLight} />
+                        <MetaChip label={t.course.meta_lessons(modLessons.length)} />
+                        <MetaChip label={t.course.meta_cards(cnt.fc)} />
+                        <MetaChip label={t.course.meta_quiz(cnt.qz)} />
+                        <MetaChip label={t.course.meta_notes(cnt.nt)} color={Colors.primary} bg="#EEF0FF" />
+                        <MetaChip label={t.course.meta_material(cnt.mt)} color={Colors.purple} bg={Colors.purpleLight} />
                       </View>
                     </ScrollView>
                   </View>
@@ -268,19 +270,19 @@ export default function CourseDetailPage() {
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
                             <View style={styles.actionRow}>
                               <ActionPill
-                                label="📝 Catatan" bg="#EEF0FF"
+                                label={t.course.action_notes} bg="#EEF0FF"
                                 onPress={() => router.push(`/notes/${lesson.id}`)}
                               />
                               <ActionPill
-                                label="📚 Materi" bg={Colors.purpleLight}
+                                label={t.course.action_material} bg={Colors.purpleLight}
                                 onPress={() => router.push(`/study-material/${lesson.id}`)}
                               />
                               <ActionPill
-                                label="🃏 Kartu" bg={Colors.primaryLight}
+                                label={t.course.action_cards} bg={Colors.primaryLight}
                                 onPress={() => router.push(`/flashcard/${lesson.id}`)}
                               />
                               <ActionPill
-                                label="❓ Quiz" bg={Colors.amberLight}
+                                label={t.course.action_quiz} bg={Colors.amberLight}
                                 onPress={() => router.push(`/quiz/${lesson.id}`)}
                               />
                               <ActionPill
@@ -299,7 +301,7 @@ export default function CourseDetailPage() {
                       onPress={() => { setTargetMod(mod.id); setShowNewLesson(true); }}
                     >
                       <Feather name="plus-circle" size={14} color={Colors.primary} />
-                      <Text style={styles.addLessonText}>Tambah Pelajaran</Text>
+                      <Text style={styles.addLessonText}>{t.course.add_lesson}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -311,7 +313,7 @@ export default function CourseDetailPage() {
         {modules.length > 0 && (
           <TouchableOpacity style={styles.addModBtn} onPress={() => setShowNewModule(true)}>
             <Feather name="plus" size={15} color={Colors.primary} />
-            <Text style={styles.addModText}>Tambah Modul Baru</Text>
+            <Text style={styles.addModText}>{t.course.add_mod_btn}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -319,7 +321,7 @@ export default function CourseDetailPage() {
       {/* MODALS */}
       {[
         {
-          vis: showNewModule, title: "📂 Modul Baru",
+          vis: showNewModule, title: t.course.new_module_modal,
           close: () => { setShowNewModule(false); setModName(""); }, save: createModule,
           body: (
             <TextInput
@@ -330,7 +332,7 @@ export default function CourseDetailPage() {
           ),
         },
         {
-          vis: showNewLesson, title: "📝 Pelajaran Baru",
+          vis: showNewLesson, title: t.course.new_lesson_modal,
           close: () => { setShowNewLesson(false); setLessonName(""); setLessonDesc(""); }, save: createLesson,
           body: (
             <>
@@ -356,11 +358,11 @@ export default function CourseDetailPage() {
                 {m.body}
                 <View style={styles.mBtns}>
                   <TouchableOpacity onPress={m.close} style={styles.mBtnCancel}>
-                    <Text style={styles.mBtnCancelText}>Batal</Text>
+                    <Text style={styles.mBtnCancelText}>{t.common.cancel}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={m.save} style={styles.mBtnOk}>
                     <LinearGradient colors={["#4A9EFF", "#6C63FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.mBtnOkGrad}>
-                      <Text style={styles.mBtnOkText}>Simpan</Text>
+                      <Text style={styles.mBtnOkText}>{t.common.save}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>

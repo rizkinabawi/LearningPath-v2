@@ -4,6 +4,7 @@ import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 function TabIcon({
   name,
@@ -24,6 +25,7 @@ function TabIcon({
 export default function TabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -59,7 +61,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t.tab.home,
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="home" focused={focused} color={color} />
           ),
@@ -68,7 +70,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="learn"
         options={{
-          title: "Kursus",
+          title: t.tab.courses,
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="book-open" focused={focused} color={color} />
           ),
@@ -77,7 +79,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="practice"
         options={{
-          title: "Latihan",
+          title: t.tab.practice,
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.centerBtn, focused && styles.centerBtnActive]}>
               <Feather name="zap" size={22} color={focused ? "#fff" : Colors.textMuted} />
@@ -88,7 +90,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="progress"
         options={{
-          title: "Progress",
+          title: t.tab.progress,
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="bar-chart-2" focused={focused} color={color} />
           ),
@@ -97,7 +99,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profil",
+          title: t.tab.profile,
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="user" focused={focused} color={color} />
           ),

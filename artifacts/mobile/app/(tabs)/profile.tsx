@@ -22,12 +22,14 @@ import { CourseBundleShareModal, CourseImportPreviewModal } from "@/components/C
 import { extractAssetsFromPack } from "@/utils/bundle-assets";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
 import { isCancellationError } from "@/utils/safe-share";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function ProfileTab() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
+  const { t, language, setLanguage } = useTranslation();
   const [user, setUser] = useState<UserType | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [pathCount, setPathCount] = useState(0);
@@ -120,20 +122,20 @@ export default function ProfileTab() {
 
   const MENU = [
     {
-      icon: "share-2" as const, label: "Bagikan Bundle Kursus",
-      sub: "Pilih kursus & bagikan ke teman",
+      icon: "share-2" as const, label: t.profile.share_bundle,
+      sub: t.profile.share_bundle_sub,
       color: Colors.teal,
       onPress: () => setShowShareModal(true),
     },
     {
-      icon: "download" as const, label: "Import Bundle Kursus",
-      sub: "Muat kursus dari file bundle teman",
+      icon: "download" as const, label: t.profile.import_bundle,
+      sub: t.profile.import_bundle_sub,
       color: Colors.primary,
       onPress: handleImportCourse,
     },
     {
-      icon: "share-2" as const, label: "Bagikan Progress",
-      sub: "Ceritakan pencapaianmu",
+      icon: "share-2" as const, label: t.profile.share_progress,
+      sub: t.profile.share_progress_sub,
       color: Colors.amber,
       onPress: async () => {
         try {
@@ -144,21 +146,21 @@ export default function ProfileTab() {
       },
     },
     {
-      icon: "refresh-cw" as const, label: "Reset Profil",
-      sub: "Data belajar tetap tersimpan",
+      icon: "refresh-cw" as const, label: t.profile.reset_profile,
+      sub: t.profile.reset_profile_sub,
       color: Colors.amber,
-      onPress: () => Alert.alert("Reset Profil", "Reset profil pengguna?", [
-        { text: "Batal", style: "cancel" },
+      onPress: () => Alert.alert(t.profile.reset_profile, "Reset profil pengguna?", [
+        { text: t.common.cancel, style: "cancel" },
         { text: "Reset", onPress: async () => { const AS = (await import("@react-native-async-storage/async-storage")).default; await AS.removeItem("user"); router.replace("/onboarding"); } },
       ]),
     },
     {
-      icon: "trash-2" as const, label: "Hapus Semua Data",
-      sub: "Tindakan ini tidak bisa dibatalkan",
+      icon: "trash-2" as const, label: t.profile.delete_all,
+      sub: t.profile.delete_all_sub,
       color: Colors.danger,
-      onPress: () => Alert.alert("Hapus Semua Data", "Semua data akan dihapus permanen.", [
-        { text: "Batal", style: "cancel" },
-        { text: "Hapus", style: "destructive", onPress: async () => { await clearAllData(); router.replace("/onboarding"); } },
+      onPress: () => Alert.alert(t.profile.delete_all, "Semua data akan dihapus permanen.", [
+        { text: t.common.cancel, style: "cancel" },
+        { text: t.common.delete, style: "destructive", onPress: async () => { await clearAllData(); router.replace("/onboarding"); } },
       ]),
     },
   ];
@@ -207,9 +209,9 @@ export default function ProfileTab() {
         {/* Stats bar */}
         <View style={styles.statsBar}>
           {[
-            { val: pathCount, lbl: "Kursus", icon: "book-open" as const },
-            { val: stats?.totalAnswers ?? 0, lbl: "Dijawab", icon: "message-circle" as const },
-            { val: `${accuracy}%`, lbl: "Akurasi", icon: "target" as const },
+            { val: pathCount, lbl: t.common.courses, icon: "book-open" as const },
+            { val: stats?.totalAnswers ?? 0, lbl: t.profile.total_answers, icon: "message-circle" as const },
+            { val: `${accuracy}%`, lbl: t.profile.accuracy, icon: "target" as const },
             { val: stats?.streak ?? 0, lbl: "Streak", icon: "activity" as const },
           ].map((s, i) => (
             <View key={i} style={[styles.statItem, i < 3 && styles.statBorder]}>
@@ -239,9 +241,9 @@ export default function ProfileTab() {
           <Text style={styles.cardSectionLabel}>Ringkasan Progress</Text>
           <View style={styles.progressRow}>
             {[
-              { val: stats?.correctAnswers ?? 0, lbl: "Benar", color: Colors.teal },
-              { val: wrong, lbl: "Salah", color: Colors.danger },
-              { val: `${accuracy}%`, lbl: "Akurasi", color: Colors.primary },
+              { val: stats?.correctAnswers ?? 0, lbl: t.profile.correct, color: Colors.teal },
+              { val: wrong, lbl: t.profile.wrong, color: Colors.danger },
+              { val: `${accuracy}%`, lbl: t.profile.accuracy, color: Colors.primary },
             ].map((p, i) => (
               <View key={i} style={[styles.progressChip, { backgroundColor: p.color + "15" }]}>
                 <Text style={[styles.progressChipVal, { color: p.color }]}>{p.val}</Text>
@@ -283,15 +285,43 @@ export default function ProfileTab() {
           </TouchableOpacity>
         </View>
 
+        {/* Bahasa / Language toggle */}
+        <Text style={styles.menuLabel}>{t.profile.section_language}</Text>
+        <View style={[styles.menuCard, shadowSm, { marginBottom: 4 }]}>
+          <View style={{ flexDirection: "row", padding: 4, gap: 8 }}>
+            {(["id", "en"] as const).map((lang) => {
+              const active = language === lang;
+              const label = lang === "id" ? `🇮🇩  ${t.profile.lang_id}` : `🇬🇧  ${t.profile.lang_en}`;
+              return (
+                <TouchableOpacity
+                  key={lang}
+                  onPress={() => setLanguage(lang)}
+                  style={{
+                    flex: 1, paddingVertical: 12, borderRadius: 14, alignItems: "center",
+                    backgroundColor: active ? Colors.primary : Colors.background,
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 14, fontWeight: "800",
+                    color: active ? "#fff" : Colors.textMuted,
+                  }}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Pengingat Belajar */}
-        <Text style={styles.menuLabel}>Pengingat Belajar</Text>
+        <Text style={styles.menuLabel}>{t.profile.section_reminder}</Text>
         <View style={[styles.reminderCard, shadowSm]}>
           <View style={styles.reminderRow}>
             <View style={[styles.menuIconWrap, { backgroundColor: Colors.primaryLight }]}>
               <Feather name="bell" size={18} color={Colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.menuTitle}>Aktifkan Pengingat</Text>
+              <Text style={styles.menuTitle}>{t.profile.reminder_toggle}</Text>
               <Text style={styles.menuSub}>
                 {reminder.enabled
                   ? `Notifikasi setiap hari pukul ${String(reminder.hour).padStart(2, "0")}:${String(reminder.minute).padStart(2, "0")}`
@@ -347,7 +377,7 @@ export default function ProfileTab() {
         </View>
 
         {/* Settings menu */}
-        <Text style={styles.menuLabel}>Pengaturan</Text>
+        <Text style={styles.menuLabel}>{t.profile.section_menu}</Text>
         {importing && (
           <View style={styles.importingBanner}>
             <ActivityIndicator size="small" color={Colors.primary} />

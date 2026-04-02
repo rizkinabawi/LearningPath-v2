@@ -11,43 +11,21 @@ import {
   type LearningPath,
 } from "@/utils/storage";
 import Colors, { shadow, shadowSm, CARD_GRADIENTS } from "@/constants/colors";
-
-const MODES = [
-  {
-    icon: "credit-card" as const,
-    label: "Flashcard",
-    sub: "Review kartu pertanyaan",
-    gradient: ["#4C6FFF", "#7C47FF"] as [string, string],
-    route: "/flashcard/browse-all",
-  },
-  {
-    icon: "help-circle" as const,
-    label: "Quiz",
-    sub: "Pilihan ganda & benar/salah",
-    gradient: ["#FF6B6B", "#FF9500"] as [string, string],
-    route: "/quiz/browse-all",
-  },
-  {
-    icon: "repeat" as const,
-    label: "Review Salah",
-    sub: "Ulangi soal yang salah",
-    gradient: ["#7C3AED", "#A855F7"] as [string, string],
-    route: "/mistakes-review",
-  },
-  {
-    icon: "zap" as const,
-    label: "Latihan Cepat",
-    sub: "5 soal acak dari semua materi",
-    gradient: ["#FF9500", "#F59E0B"] as [string, string],
-    route: "/(tabs)/learn",
-  },
-];
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function PracticeTab() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
+  const { t } = useTranslation();
+
+  const MODES = [
+    { icon: "credit-card" as const, label: t.practice.mode_flash, sub: t.practice.mode_flash_sub, gradient: ["#4C6FFF", "#7C47FF"] as [string, string], route: "/flashcard/browse-all" },
+    { icon: "help-circle" as const, label: t.practice.mode_quiz, sub: t.practice.mode_quiz_sub, gradient: ["#FF6B6B", "#FF9500"] as [string, string], route: "/quiz/browse-all" },
+    { icon: "repeat" as const, label: t.practice.mode_review, sub: t.practice.mode_review_sub, gradient: ["#7C3AED", "#A855F7"] as [string, string], route: "/mistakes-review" },
+    { icon: "zap" as const, label: t.practice.mode_fast, sub: t.practice.mode_fast_sub, gradient: ["#FF9500", "#F59E0B"] as [string, string], route: "/(tabs)/learn" },
+  ];
   const SCROLL_PAD = 20; // matches styles.scroll padding
   const modeCardWidth = isTablet
     ? (width - 64 - 10) / 4        // 4 kolom di tablet (pad 32*2)
@@ -81,8 +59,8 @@ export default function PracticeTab() {
         <View style={styles.hBlob2} />
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.headerSub}>Mode Latihan</Text>
-            <Text style={styles.headerTitle}>Latihan</Text>
+            <Text style={styles.headerSub}>{t.practice.header_sub}</Text>
+            <Text style={styles.headerTitle}>{t.practice.header_title}</Text>
           </View>
           <View style={styles.streakBadge}>
             <Feather name="zap" size={16} color="#fff" />
@@ -93,9 +71,9 @@ export default function PracticeTab() {
         {/* Content summary */}
         <View style={styles.summaryRow}>
           {[
-            { icon: "credit-card" as const, val: cardCount, label: "Flashcard" },
-            { icon: "help-circle" as const, val: quizCount, label: "Quiz Soal" },
-            { icon: "book-open" as const, val: paths.length, label: "Kursus" },
+            { icon: "credit-card" as const, val: cardCount, label: t.practice.stat_cards },
+            { icon: "help-circle" as const, val: quizCount, label: t.practice.stat_quiz },
+            { icon: "book-open" as const, val: paths.length, label: t.practice.stat_courses },
           ].map((s, i) => (
             <View key={i} style={styles.summaryChip}>
               <Feather name={s.icon} size={14} color="rgba(255,255,255,0.85)" />
@@ -114,7 +92,7 @@ export default function PracticeTab() {
         showsVerticalScrollIndicator={false}
       >
         {/* Mode grid */}
-        <Text style={styles.sectionTitle}>Pilih Mode</Text>
+        <Text style={styles.sectionTitle}>{t.practice.section_mode}</Text>
         <View style={styles.modeGrid}>
           {MODES.map((m, i) => (
             <TouchableOpacity
@@ -146,7 +124,7 @@ export default function PracticeTab() {
         {/* Kursus untuk latihan */}
         {paths.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Pilih Kursus</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 8 }]}>{t.practice.section_course}</Text>
             <View style={styles.courseList}>
               {paths.map((path, i) => (
                 <TouchableOpacity
@@ -163,10 +141,10 @@ export default function PracticeTab() {
                   </LinearGradient>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.courseRowName} numberOfLines={1}>{path.name}</Text>
-                    <Text style={styles.courseRowSub} numberOfLines={1}>{path.description || "Ketuk untuk mulai latihan"}</Text>
+                    <Text style={styles.courseRowSub} numberOfLines={1}>{path.description || t.practice.practice_btn}</Text>
                   </View>
                   <TouchableOpacity style={styles.practiceBtn} onPress={() => router.push("/(tabs)/learn")}>
-                    <Text style={styles.practiceBtnText}>Latihan</Text>
+                    <Text style={styles.practiceBtnText}>{t.practice.practice_btn}</Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))}
@@ -179,10 +157,10 @@ export default function PracticeTab() {
             <LinearGradient colors={["#4C6FFF","#7C47FF"]} style={styles.emptyGrad}>
               <View style={styles.hBlob1} />
               <Feather name="book-open" size={36} color="rgba(255,255,255,0.85)" />
-              <Text style={styles.emptyTitle}>Belum Ada Kursus</Text>
-              <Text style={styles.emptySub}>Buat kursus di tab Kursus untuk mulai berlatih</Text>
+              <Text style={styles.emptyTitle}>{t.practice.no_course_title}</Text>
+              <Text style={styles.emptySub}>{t.practice.no_course_sub}</Text>
               <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push("/(tabs)/learn")}>
-                <Text style={styles.emptyBtnText}>Buat Kursus</Text>
+                <Text style={styles.emptyBtnText}>{t.practice.create_course}</Text>
               </TouchableOpacity>
             </LinearGradient>
           </View>

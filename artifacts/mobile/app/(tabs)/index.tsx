@@ -20,6 +20,7 @@ import {
 import Colors, { shadow, shadowSm, CARD_GRADIENTS } from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
 import { AdBanner } from "@/components/AdBanner";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const { width } = Dimensions.get("window");
 
@@ -35,12 +36,11 @@ const COURSE_ICONS: React.ComponentProps<typeof Feather>["name"][] = [
   "book", "code", "globe", "cpu", "layers", "award",
 ];
 
-const DAY_ID = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
-const MONTH_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 export default function Dashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [paths, setPaths] = useState<LearningPath[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -63,9 +63,9 @@ export default function Dashboard() {
 
   const now = new Date();
   const hour = now.getHours();
-  const greet = hour < 12 ? "Selamat pagi" : hour < 17 ? "Selamat siang" : "Selamat malam";
+  const greet = hour < 12 ? t.home.greeting_morning : hour < 17 ? t.home.greeting_afternoon : t.home.greeting_evening;
   const firstName = user?.name?.split(" ")[0] ?? "Learner";
-  const dateStr = `${DAY_ID[now.getDay()]}, ${now.getDate()} ${MONTH_ID[now.getMonth()]} ${now.getFullYear()}`;
+  const dateStr = t.home.date_format(t.home.days[now.getDay()], now.getDate(), t.home.months[now.getMonth()]);
   const tip = TIPS[now.getDate() % TIPS.length];
 
   return (
@@ -114,10 +114,10 @@ export default function Dashboard() {
           {/* Stats strip */}
           <View style={styles.statsRow}>
             {[
-              { icon: "activity" as const, val: `${stats?.streak ?? 0}`, label: "Streak" },
-              { icon: "check-circle" as const, val: `${accuracy}%`, label: "Akurasi" },
-              { icon: "message-square" as const, val: `${stats?.totalAnswers ?? 0}`, label: "Jawaban" },
-              { icon: "book" as const, val: `${paths.length}`, label: "Kursus" },
+              { icon: "activity" as const, val: `${stats?.streak ?? 0}`, label: t.home.streak },
+              { icon: "check-circle" as const, val: `${accuracy}%`, label: t.home.accuracy },
+              { icon: "message-square" as const, val: `${stats?.totalAnswers ?? 0}`, label: t.home.answers },
+              { icon: "book" as const, val: `${paths.length}`, label: t.home.courses },
             ].map((s, i) => (
               <View key={i} style={[styles.statItem, i < 3 && styles.statItemBorder]}>
                 <Feather name={s.icon} size={16} color="rgba(255,255,255,0.75)" />
@@ -138,9 +138,9 @@ export default function Dashboard() {
         {paths.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Lanjutkan Belajar</Text>
+              <Text style={styles.sectionTitle}>{t.home.section_continue}</Text>
               <TouchableOpacity onPress={() => router.push("/(tabs)/learn")} style={styles.seeAllBtn}>
-                <Text style={styles.seeAllText}>Lihat Semua</Text>
+                <Text style={styles.seeAllText}>{t.home.see_all}</Text>
                 <Feather name="chevron-right" size={13} color={Colors.primary} />
               </TouchableOpacity>
             </View>
@@ -267,37 +267,37 @@ export default function Dashboard() {
 
         {/* ═══ MENU CEPAT ═══ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Menu Cepat</Text>
+          <Text style={styles.sectionTitle}>{t.home.section_quick}</Text>
           <View style={styles.quickGrid}>
             {[
               {
                 icon: "credit-card" as const,
-                label: "Flashcard",
-                sub: "Review kartu",
+                label: t.home.quick_flash,
+                sub: t.home.quick_flash_sub,
                 color: Colors.primary,
                 bg: Colors.primaryLight,
                 route: "/(tabs)/practice",
               },
               {
                 icon: "help-circle" as const,
-                label: "Quiz",
-                sub: "Pilihan ganda",
+                label: t.home.quick_quiz,
+                sub: t.home.quick_quiz_sub,
                 color: Colors.amber,
                 bg: Colors.amberLight,
                 route: "/(tabs)/practice",
               },
               {
                 icon: "cpu" as const,
-                label: "AI Prompt",
-                sub: "Buat soal dengan AI",
+                label: t.home.quick_ai,
+                sub: t.home.quick_ai_sub,
                 color: Colors.purple,
                 bg: Colors.purpleLight,
                 route: "/(tabs)/progress?tab=prompts",
               },
               {
                 icon: "bar-chart-2" as const,
-                label: "Progress",
-                sub: "Lihat statistik",
+                label: t.home.quick_progress,
+                sub: t.home.quick_progress_sub,
                 color: Colors.teal,
                 bg: Colors.tealLight,
                 route: "/(tabs)/progress",

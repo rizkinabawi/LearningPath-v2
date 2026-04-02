@@ -17,6 +17,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ToastContainer } from "@/components/Toast";
 import { scheduleDailyMotivation, getReminderSettings, scheduleStudyReminder } from "@/utils/notifications";
 import { isCancellationError } from "@/utils/safe-share";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 
 // Suppress share-cancellation noise in dev overlay
 LogBox.ignoreLogs([
@@ -280,12 +281,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <RootLayoutNav />
-            <ToastContainer />
-          </GestureHandlerRootView>
-        </QueryClientProvider>
+        <LanguageProvider>
+          <QueryClientProvider client={queryClient}>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <RootLayoutNav />
+              <ToastContainer />
+            </GestureHandlerRootView>
+          </QueryClientProvider>
+        </LanguageProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

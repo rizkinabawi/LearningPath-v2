@@ -28,6 +28,7 @@ import {
 import { embedAssetsInPack, countEmbeddedAssets } from "@/utils/bundle-assets";
 import { isCancellationError } from "@/utils/safe-share";
 import Colors from "@/constants/colors";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const COURSE_GRADIENTS: [string, string][] = [
   ["#4C6FFF", "#7C47FF"],
@@ -54,6 +55,7 @@ export default function LearnPage() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
+  const { t } = useTranslation();
 
   const [paths, setPaths] = useState<LearningPath[]>([]);
   const [stats, setStats] = useState<Record<string, CourseStats>>({});
@@ -98,12 +100,12 @@ export default function LearnPage() {
 
   const handleDelete = (p: LearningPath) => {
     Alert.alert(
-      "Hapus Kursus",
-      `Hapus "${p.name}"? Semua modul, pelajaran, dan materi di dalamnya akan ikut terhapus.`,
+      t.learn.delete_title,
+      t.learn.delete_msg(p.name),
       [
-        { text: "Batal", style: "cancel" },
+        { text: t.common.cancel, style: "cancel" },
         {
-          text: "Hapus", style: "destructive",
+          text: t.common.delete, style: "destructive",
           onPress: async () => {
             await deleteLearningPath(p.id);
             loadData();
@@ -171,8 +173,8 @@ export default function LearnPage() {
         <View style={styles.hdot2} />
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.headerSub}>KURIKULUM</Text>
-            <Text style={styles.headerTitle}>My Courses</Text>
+            <Text style={styles.headerSub}>{t.learn.header_sub}</Text>
+            <Text style={styles.headerTitle}>{t.learn.header_title}</Text>
           </View>
           <TouchableOpacity
             onPress={() => setShowNewPath(true)}
@@ -185,7 +187,7 @@ export default function LearnPage() {
           </TouchableOpacity>
         </View>
         {paths.length > 0 && (
-          <Text style={styles.headerCount}>{paths.length} kursus tersedia</Text>
+          <Text style={styles.headerCount}>{t.learn.courses_available(paths.length)}</Text>
         )}
       </LinearGradient>
 
@@ -210,7 +212,7 @@ export default function LearnPage() {
               <View style={styles.emptyIconWrap}>
                 <Feather name="plus-circle" size={40} color="rgba(255,255,255,0.9)" />
               </View>
-              <Text style={styles.emptyTitle}>Buat Kursus Pertama</Text>
+              <Text style={styles.emptyTitle}>{t.learn.empty_title}</Text>
               <Text style={styles.emptySub}>Tap untuk membuat jalur belajarmu sendiri</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -257,10 +259,10 @@ export default function LearnPage() {
 
                     {/* Stats row */}
                     <View style={styles.statsRow}>
-                      <StatPill icon="layers" value={s.modules} label="Modul" />
-                      <StatPill icon="book" value={s.lessons} label="Pelajaran" />
-                      <StatPill icon="credit-card" value={s.flashcards} label="Kartu" />
-                      <StatPill icon="help-circle" value={s.quizzes} label="Quiz" />
+                      <StatPill icon="layers" value={s.modules} label={t.learn.stat_modules} />
+                      <StatPill icon="book" value={s.lessons} label={t.learn.stat_lessons} />
+                      <StatPill icon="credit-card" value={s.flashcards} label={t.learn.stat_cards} />
+                      <StatPill icon="help-circle" value={s.quizzes} label={t.learn.stat_quiz} />
                     </View>
 
                     {/* Share button */}
@@ -279,7 +281,7 @@ export default function LearnPage() {
                       ) : (
                         <>
                           <Feather name="share-2" size={14} color="rgba(255,255,255,0.9)" />
-                          <Text style={styles.shareBtnText}>Bagikan Kursus Ini</Text>
+                          <Text style={styles.shareBtnText}>{t.learn.share_btn}</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -295,7 +297,7 @@ export default function LearnPage() {
               style={[styles.addMoreCard, isTablet && styles.courseCardTablet]}
             >
               <Feather name="plus-circle" size={22} color={Colors.primary} />
-              <Text style={styles.addMoreText}>Tambah Kursus Baru</Text>
+              <Text style={styles.addMoreText}>{t.learn.add_more}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -306,7 +308,7 @@ export default function LearnPage() {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <View style={styles.mOverlay}>
             <View style={styles.mBox}>
-              <Text style={styles.mTitle}>📚 Kursus Baru</Text>
+              <Text style={styles.mTitle}>{t.learn.new_course_modal}</Text>
               <TextInput
                 placeholder="Nama kursus" value={pathName}
                 onChangeText={setPathName} style={styles.mInput}
@@ -323,7 +325,7 @@ export default function LearnPage() {
                 </TouchableOpacity>
                 <TouchableOpacity onPress={createPath} style={styles.mBtnOk}>
                   <LinearGradient colors={["#4A9EFF", "#6C63FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.mBtnOkGrad}>
-                    <Text style={styles.mBtnOkText}>Buat Kursus</Text>
+                    <Text style={styles.mBtnOkText}>{t.learn.create_btn}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
