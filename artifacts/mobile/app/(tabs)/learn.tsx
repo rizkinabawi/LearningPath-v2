@@ -10,18 +10,23 @@ import {
   StyleSheet,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
+  Share,
   useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as FileSystem from "expo-file-system";
 import {
   getLearningPaths, getModules, getLessons,
   getFlashcards, getQuizzes,
-  saveLearningPath, deleteLearningPath,
+  saveLearningPath, deleteLearningPath, exportCourse,
   generateId, type LearningPath,
 } from "@/utils/storage";
+import { embedAssetsInPack, countEmbeddedAssets } from "@/utils/bundle-assets";
+import { isCancellationError } from "@/utils/safe-share";
 import Colors from "@/constants/colors";
 
 const COURSE_GRADIENTS: [string, string][] = [
@@ -55,6 +60,7 @@ export default function LearnPage() {
   const [showNewPath, setShowNewPath] = useState(false);
   const [pathName, setPathName] = useState("");
   const [pathDesc, setPathDesc] = useState("");
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
   const loadData = async () => {
     const data = await getLearningPaths();
@@ -105,6 +111,49 @@ export default function LearnPage() {
         },
       ]
     );
+  };
+
+  const handleShare = async (p: LearningPath) => {
+    if (sharingId) return;
+    setSharingId(p.id);
+    try {
+      const rawPack = await exportCourse(p.id);
+      const pack = await embedAssetsInPack(rawPack);
+      const json = JSON.stringify(pack);
+      const slug = p.name.replace(/\s+/g, "-").toLowerCase();
+      const filename = `bundle-${slug}-${Date.now()}.json`;
+
+      const assets = countEmbeddedAssets(pack);
+      const assetSummary = [
+        assets.images > 0 ? `${assets.images} gambar` : "",
+        assets.files > 0 ? `${assets.files} file` : "",
+        assets.links > 0 ? `${assets.links} link` : "",
+      ].filter(Boolean).join(", ");
+
+      if (Platform.OS === "web") {
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
+        await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+        const assetMsg = assetSummary ? ` Sudah termasuk ${assetSummary}.` : "";
+        await Share.share({
+          url: fileUri,
+          title: `Bundle Kursus: ${p.name}`,
+          message:
+            `Hei! Aku mau berbagi kursus "${p.name}" denganmu. ` +
+            `Berisi ${pack.lessons?.length ?? 0} pelajaran, ${pack.flashcards?.length ?? 0} flashcard, dan ${pack.quizzes?.length ?? 0} soal quiz.${assetMsg} ` +
+            `Import file ini ke Mobile Learning App untuk langsung belajar! 🎓`,
+        });
+      }
+    } catch (e) {
+      if (!isCancellationError(e)) console.warn("[LearnPage] share error", e);
+    } finally {
+      setSharingId(null);
+    }
   };
 
   const numCols = isTablet ? 2 : 1;
@@ -213,6 +262,27 @@ export default function LearnPage() {
                       <StatPill icon="credit-card" value={s.flashcards} label="Kartu" />
                       <StatPill icon="help-circle" value={s.quizzes} label="Quiz" />
                     </View>
+
+                    {/* Share button */}
+                    <View style={styles.shareDivider} />
+                    <TouchableOpacity
+                      onPress={(e) => { e.stopPropagation?.(); handleShare(p); }}
+                      style={styles.shareBtn}
+                      activeOpacity={0.75}
+                      disabled={!!sharingId}
+                    >
+                      {sharingId === p.id ? (
+                        <>
+                          <ActivityIndicator size="small" color="rgba(255,255,255,0.9)" />
+                          <Text style={styles.shareBtnText}>Menyiapkan bundle...</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Feather name="share-2" size={14} color="rgba(255,255,255,0.9)" />
+                          <Text style={styles.shareBtnText}>Bagikan Kursus Ini</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   </LinearGradient>
                 </TouchableOpacity>
               );
@@ -337,6 +407,17 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 12, fontWeight: "800", color: "#fff" },
   statLabel: { fontSize: 10, fontWeight: "600", color: "rgba(255,255,255,0.75)" },
+
+  shareDivider: {
+    height: 1, backgroundColor: "rgba(255,255,255,0.18)", marginVertical: 14,
+  },
+  shareBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 10, borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
+  },
+  shareBtnText: { fontSize: 13, fontWeight: "700", color: "rgba(255,255,255,0.92)" },
 
   addMoreCard: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
