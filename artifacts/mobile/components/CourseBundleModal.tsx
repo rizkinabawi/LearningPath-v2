@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Platform, Share,
 } from "react-native";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import { Feather } from "@expo/vector-icons";
 import {
   getLearningPaths, getModules, getLessons, getFlashcards, getQuizzes,
