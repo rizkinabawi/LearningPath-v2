@@ -23,6 +23,7 @@ import {
   Copy,
   Check,
   Download,
+  PencilLine,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
@@ -173,6 +174,14 @@ export default function CreateQuizScreen() {
   const [showPackModal, setShowPackModal] = useState(false);
   const [newPackName, setNewPackName] = useState("");
   const [pendingImportItems, setPendingImportItems] = useState<any[]>([]);
+
+  // Edit modal state
+  const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
+  const [editQuestion, setEditQuestion] = useState("");
+  const [editOptions, setEditOptions] = useState(["", "", "", ""]);
+  const [editCorrectOption, setEditCorrectOption] = useState<number | null>(null);
+  const [editImageUri, setEditImageUri] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
 
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptTopic, setPromptTopic] = useState("");
@@ -346,35 +355,113 @@ export default function CreateQuizScreen() {
   };
 
   const doImport = async (items: any[], packId: string | undefined) => {
-    let count = 0;
+    const toAdd: Quiz[] = [];
     for (const item of items) {
       if (!item.question || !Array.isArray(item.options)) continue;
       const { options, answer } = resolveAnswer(item);
       if (!answer) continue;
-      const quiz: Quiz = {
+      toAdd.push({
         id: generateId(),
         lessonId: lessonId ?? "",
         packId,
         question: String(item.question).trim(),
         options,
         answer,
+        explanation: item.explanation ? String(item.explanation).trim() : undefined,
         type: "multiple-choice",
         createdAt: new Date().toISOString(),
-      };
-      await saveQuiz(quiz);
-      setExisting((prev) => [...prev, quiz]);
-      count++;
+      });
     }
+    // Save all at once, then update state once (prevents per-item re-render lag)
+    try {
+      await Promise.all(toAdd.map((q) => saveQuiz(q)));
+    } catch {
+      toast.error("Gagal menyimpan beberapa soal, coba lagi.");
+      return;
+    }
+    setExisting((prev) => [...prev, ...toAdd]);
     setPendingImportItems([]);
     setImportJson("");
     setShowImport(false);
     setShowPackModal(false);
     setNewPackName("");
-    if (count > 0) {
-      toast.success(t.create_qz.import_done(count));
+    if (toAdd.length > 0) {
+      toast.success(t.create_qz.import_done(toAdd.length));
     } else {
       toast.error(t.create_qz.no_saved);
     }
+  };
+
+  /** Open edit modal pre-filled with the quiz data */
+  const openEdit = (quiz: Quiz) => {
+    const opts = [...quiz.options];
+    while (opts.length < 4) opts.push("");
+    const correctIdx = opts.findIndex((o) => o === quiz.answer);
+    setEditingQuiz(quiz);
+    setEditQuestion(quiz.question);
+    setEditOptions(opts);
+    setEditCorrectOption(correctIdx >= 0 ? correctIdx : null);
+    setEditImageUri(quiz.image ?? null);
+  };
+
+  const pickEditImage = async () => {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Izin Diperlukan", "Izinkan akses galeri untuk upload gambar.");
+        return;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setEditImageUri(result.assets[0].uri);
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (!editingQuiz) return;
+    if (!editQuestion.trim()) {
+      Alert.alert("Pertanyaan kosong", "Isi pertanyaan terlebih dahulu.");
+      return;
+    }
+    const filledOptions = editOptions.filter((o) => o.trim());
+    if (filledOptions.length < 2) {
+      Alert.alert("Pilihan kurang", "Isi minimal 2 pilihan jawaban.");
+      return;
+    }
+    if (editCorrectOption === null || !editOptions[editCorrectOption]?.trim()) {
+      Alert.alert("Jawaban belum dipilih", "Pilih jawaban yang benar.");
+      return;
+    }
+    setEditLoading(true);
+    let savedImage: string | undefined = editImageUri ?? undefined;
+    if (editImageUri && editImageUri !== editingQuiz.image) {
+      try {
+        savedImage = await saveImageToLocal(editImageUri, editingQuiz.id);
+      } catch {
+        savedImage = editImageUri;
+      }
+    }
+    const updated: Quiz = {
+      ...editingQuiz,
+      question: editQuestion.trim(),
+      options: editOptions.filter((o) => o.trim()),
+      answer: editOptions[editCorrectOption].trim(),
+      image: savedImage,
+    };
+    try {
+      await saveQuiz(updated);
+      setExisting((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+      toast.success("Soal diperbarui!");
+    } catch {
+      toast.error("Gagal menyimpan perubahan.");
+    }
+    setEditLoading(false);
+    setEditingQuiz(null);
   };
 
   const doImportToPack = async (packId: string) => {
@@ -868,7 +955,7 @@ export default function CreateQuizScreen() {
           <Text style={styles.sectionTitle}>
             Soal yang Ada ({existing.length})
           </Text>
-          {existing.map((q, i) => (
+          {(activePack ? existing.filter((q) => q.packId === activePack.id) : existing).map((q, i) => (
             <View key={q.id} style={styles.questionRow}>
               {q.image && (
                 <Image
@@ -882,23 +969,125 @@ export default function CreateQuizScreen() {
                 <Text style={styles.questionText}>{q.question}</Text>
                 <Text style={styles.questionAnswer}>✓ {q.answer}</Text>
               </View>
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert(t.create_qz.delete_quiz_title, t.create_qz.delete_quiz_msg, [
-                    { text: t.common.cancel, style: "cancel" },
-                    {
-                      text: t.common.delete,
-                      style: "destructive",
-                      onPress: () => handleDelete(q.id),
-                    },
-                  ]);
-                }}
-                style={styles.deleteBtn}
-              >
-                <Trash2 size={16} color={Colors.danger} />
-              </TouchableOpacity>
+              <View style={styles.cardActions}>
+                <TouchableOpacity
+                  onPress={() => openEdit(q)}
+                  style={styles.editBtn}
+                >
+                  <PencilLine size={14} color={Colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    Alert.alert(t.create_qz.delete_quiz_title, t.create_qz.delete_quiz_msg, [
+                      { text: t.common.cancel, style: "cancel" },
+                      {
+                        text: t.common.delete,
+                        style: "destructive",
+                        onPress: () => handleDelete(q.id),
+                      },
+                    ]);
+                  }}
+                  style={styles.deleteBtn}
+                >
+                  <Trash2 size={14} color={Colors.danger} />
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
+        </View>
+      )}
+
+      {/* ── EDIT QUIZ MODAL ── */}
+      {editingQuiz && (
+        <View style={styles.modalOverlay}>
+          <ScrollView
+            style={{ width: "100%" }}
+            contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 40 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.editModalCard}>
+              {/* Header */}
+              <View style={styles.editModalHeader}>
+                <Text style={styles.editModalTitle}>Edit Soal</Text>
+                <TouchableOpacity onPress={() => setEditingQuiz(null)} style={styles.closeBtn}>
+                  <X size={18} color={Colors.dark} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Question */}
+              <Text style={styles.editFieldLabel}>Pertanyaan</Text>
+              <TextInput
+                value={editQuestion}
+                onChangeText={setEditQuestion}
+                placeholder="Tulis pertanyaan di sini..."
+                style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+                placeholderTextColor={Colors.textMuted}
+                multiline
+              />
+
+              {/* Image */}
+              <Text style={[styles.editFieldLabel, { marginTop: 12 }]}>Foto Soal (opsional)</Text>
+              <TouchableOpacity style={styles.imagePicker} onPress={pickEditImage} activeOpacity={0.8}>
+                {editImageUri ? (
+                  <Image source={{ uri: editImageUri }} style={styles.imagePreview} resizeMode="cover" />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <ImagePlus size={24} color={Colors.textMuted} />
+                    <Text style={styles.imagePlaceholderText}>Tap untuk tambah foto</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {editImageUri && (
+                <TouchableOpacity style={styles.removeImage} onPress={() => setEditImageUri(null)}>
+                  <Text style={styles.removeImageText}>Hapus Foto</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Options */}
+              <Text style={[styles.editFieldLabel, { marginTop: 12 }]}>Pilihan Jawaban</Text>
+              <Text style={styles.fieldHint}>Tap badge huruf untuk set jawaban benar</Text>
+              {editOptions.map((opt, idx) => {
+                const label = ["A", "B", "C", "D"][idx];
+                const isCorrect = editCorrectOption === idx;
+                return (
+                  <View key={idx} style={[styles.optionRow, isCorrect && styles.optionRowActive, { marginBottom: 8 }]}>
+                    <TouchableOpacity
+                      style={[styles.optionBadge, isCorrect && styles.optionBadgeActive]}
+                      onPress={() => setEditCorrectOption(idx)}
+                    >
+                      {isCorrect ? (
+                        <Check size={14} color={Colors.white} />
+                      ) : (
+                        <Text style={styles.optionBadgeText}>{label}</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TextInput
+                      value={opt}
+                      onChangeText={(v) => {
+                        const updated = [...editOptions];
+                        updated[idx] = v;
+                        setEditOptions(updated);
+                      }}
+                      placeholder={`Pilihan ${label}`}
+                      style={styles.optionInput}
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
+                );
+              })}
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={[styles.editSaveBtn, editLoading && { opacity: 0.6 }]}
+                onPress={handleEditSave}
+                disabled={editLoading}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.editSaveBtnText}>{editLoading ? "Menyimpan..." : "Simpan Perubahan"}</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       )}
     </KeyboardAwareScrollViewCompat>
@@ -1281,6 +1470,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   questionAnswer: { fontSize: 13, color: Colors.success, fontWeight: "600" },
+  cardActions: {
+    flexDirection: "column",
+    gap: 6,
+    alignItems: "center",
+  },
+  editBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   deleteBtn: {
     width: 32,
     height: 32,
@@ -1288,6 +1490,49 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dangerLight,
     alignItems: "center",
     justifyContent: "center",
+  },
+  editModalCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 20,
+    gap: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  editModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  editModalTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: Colors.dark,
+  },
+  editFieldLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  editSaveBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  editSaveBtnText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: Colors.white,
   },
 
   // Packs

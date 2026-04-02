@@ -70,6 +70,7 @@ export interface Quiz {
   question: string;
   options: string[];
   answer: string;
+  explanation?: string;
   type: "multiple-choice" | "true-false";
   lessonId: string;
   packId?: string;
