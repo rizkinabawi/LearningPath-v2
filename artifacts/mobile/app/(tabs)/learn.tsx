@@ -11,7 +11,6 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
-  Share,
   useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -26,9 +25,10 @@ import {
   generateId, type LearningPath,
 } from "@/utils/storage";
 import { embedAssetsInPack, countEmbeddedAssets } from "@/utils/bundle-assets";
-import { isCancellationError } from "@/utils/safe-share";
+import { isCancellationError, safeShareFile } from "@/utils/safe-share";
 import Colors from "@/constants/colors";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { toast } from "@/components/Toast";
 
 const COURSE_GRADIENTS: [string, string][] = [
   ["#4C6FFF", "#7C47FF"],
@@ -122,7 +122,7 @@ export default function LearnPage() {
       const rawPack = await exportCourse(p.id);
       const pack = await embedAssetsInPack(rawPack);
       const json = JSON.stringify(pack);
-      const slug = p.name.replace(/\s+/g, "-").toLowerCase();
+      const slug = p.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
       const filename = `bundle-${slug}-${Date.now()}.json`;
 
       const assets = countEmbeddedAssets(pack);
@@ -138,21 +138,31 @@ export default function LearnPage() {
         const a = document.createElement("a");
         a.href = url; a.download = filename; a.click();
         URL.revokeObjectURL(url);
+        toast.success("Bundle berhasil diunduh!");
       } else {
         const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
-        await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
-        const assetMsg = assetSummary ? ` Sudah termasuk ${assetSummary}.` : "";
-        await Share.share({
-          url: fileUri,
-          title: `Bundle Kursus: ${p.name}`,
-          message:
-            `Hei! Aku mau berbagi kursus "${p.name}" denganmu. ` +
-            `Berisi ${pack.lessons?.length ?? 0} pelajaran, ${pack.flashcards?.length ?? 0} flashcard, dan ${pack.quizzes?.length ?? 0} soal quiz.${assetMsg} ` +
-            `Import file ini ke Mobile Learning App untuk langsung belajar! 🎓`,
+        await FileSystem.writeAsStringAsync(fileUri, json, {
+          encoding: FileSystem.EncodingType.UTF8,
         });
+        const assetMsg = assetSummary ? ` Termasuk ${assetSummary}.` : "";
+        const shared = await safeShareFile(fileUri, {
+          mimeType: "application/json",
+          dialogTitle: `Bundle Kursus: ${p.name}`,
+          UTI: "public.json",
+        });
+        if (shared) {
+          toast.success(
+            `Bundle "${p.name}" siap dibagikan!${assetMsg}`
+          );
+        } else {
+          toast.info("Berbagi dibatalkan.");
+        }
       }
     } catch (e) {
-      if (!isCancellationError(e)) console.warn("[LearnPage] share error", e);
+      if (!isCancellationError(e)) {
+        console.warn("[LearnPage] share error", e);
+        toast.error("Gagal membuat bundle. Coba lagi.");
+      }
     } finally {
       setSharingId(null);
     }
