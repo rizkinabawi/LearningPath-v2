@@ -39,7 +39,14 @@ export async function getInfoAsync(
   fileUri: string,
   _options?: { size?: boolean; md5?: boolean }
 ): Promise<FileInfo> {
+  // Paths ending with "/" are directories — use Directory, not File
+  const isDir = fileUri.endsWith("/");
   try {
+    if (isDir) {
+      const d = new Directory(fileUri);
+      if (!d.exists) return { exists: false, uri: fileUri, isDirectory: true };
+      return { exists: true, uri: fileUri, isDirectory: true };
+    }
     const f = new File(fileUri);
     if (!f.exists) return { exists: false, uri: fileUri };
     const info = f.info();
@@ -49,6 +56,11 @@ export async function getInfoAsync(
       size: info.size ?? undefined,
     };
   } catch {
+    // Fallback: try Directory if File check throws (e.g. path is actually a dir)
+    try {
+      const d = new Directory(fileUri);
+      if (d.exists) return { exists: true, uri: fileUri, isDirectory: true };
+    } catch { /* ignored */ }
     return { exists: false, uri: fileUri };
   }
 }
@@ -78,6 +90,7 @@ export async function makeDirectoryAsync(
   options?: { intermediates?: boolean }
 ): Promise<void> {
   const d = new Directory(fileUri);
+  if (d.exists) return; // idempotent — already exists, skip
   d.create({ intermediates: options?.intermediates ?? false });
 }
 
