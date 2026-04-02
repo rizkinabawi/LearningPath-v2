@@ -12,7 +12,9 @@ import {
   Linking,
   KeyboardAvoidingView,
   Image,
+  Dimensions,
 } from "react-native";
+import { WebView } from "react-native-webview";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -49,6 +51,105 @@ import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
 import { isCancellationError } from "@/utils/safe-share";
 import { useTranslation } from "@/contexts/LanguageContext";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const PLAYER_WIDTH = Math.min(SCREEN_WIDTH - 32, 480);
+const PLAYER_HEIGHT = Math.round(PLAYER_WIDTH * 9 / 16);
+
+/** Extract YouTube video ID from any YouTube URL format */
+const extractYoutubeId = (url: string): string | null => {
+  try {
+    const cleaned = url.trim();
+    // youtu.be/ID
+    const short = cleaned.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (short) return short[1];
+    // youtube.com/shorts/ID
+    const shorts = cleaned.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (shorts) return shorts[1];
+    // youtube.com/embed/ID
+    const embed = cleaned.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+    if (embed) return embed[1];
+    // youtube.com/watch?v=ID  (v= anywhere in query string)
+    const watch = cleaned.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (watch) return watch[1];
+  } catch {}
+  return null;
+};
+
+/** Inline YouTube embed using WebView */
+function YoutubeEmbed({ url }: { url: string }) {
+  const videoId = extractYoutubeId(url);
+  if (!videoId) {
+    return (
+      <TouchableOpacity
+        style={ytStyles.fallback}
+        onPress={() => Linking.openURL(url).catch(() => {})}
+        activeOpacity={0.8}
+      >
+        <Video size={20} color="#FF0000" />
+        <Text style={ytStyles.fallbackText}>Buka di YouTube</Text>
+        <ExternalLink size={14} color={Colors.textMuted} />
+      </TouchableOpacity>
+    );
+  }
+
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1`;
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={ytStyles.container}>
+        {/* @ts-ignore - iframe is valid on web */}
+        <iframe
+          src={embedUrl}
+          width={PLAYER_WIDTH}
+          height={PLAYER_HEIGHT}
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          style={{ borderRadius: 12, display: "block" }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={ytStyles.container}>
+      <WebView
+        source={{ uri: embedUrl }}
+        style={{ width: PLAYER_WIDTH, height: PLAYER_HEIGHT, borderRadius: 12 }}
+        allowsInlineMediaPlayback
+        mediaPlaybackRequiresUserAction={false}
+        javaScriptEnabled
+        domStorageEnabled
+        startInLoadingState
+        scrollEnabled={false}
+      />
+      <TouchableOpacity
+        style={ytStyles.openBtn}
+        onPress={() => Linking.openURL(url).catch(() => {})}
+        activeOpacity={0.8}
+      >
+        <ExternalLink size={12} color={Colors.textMuted} />
+        <Text style={ytStyles.openBtnText}>Buka di YouTube</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const ytStyles = StyleSheet.create({
+  container: { gap: 8 },
+  fallback: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: "#FFF0F0", borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: "#FFD0D0",
+  },
+  fallbackText: { flex: 1, fontSize: 14, fontWeight: "700", color: "#FF0000" },
+  openBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, paddingVertical: 6,
+  },
+  openBtnText: { fontSize: 12, color: Colors.textMuted, fontWeight: "600" },
+});
 
 const MATERIAL_DIR =
   ((FileSystem as any).documentDirectory ?? "") + "study-materials/";
@@ -491,22 +592,7 @@ export default function StudyMaterialScreen() {
                     )}
 
                     {mat.type === "youtube" && (
-                      <View style={styles.linkBox}>
-                        <View style={styles.linkIconWrap}>
-                          <Video size={24} color="#FF0000" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.linkLabel}>YouTube Video</Text>
-                          <Text style={styles.linkUrl} numberOfLines={2}>{mat.content}</Text>
-                        </View>
-                        <TouchableOpacity
-                          style={[styles.openLinkBtn, { backgroundColor: "#FF0000" }]}
-                          onPress={() => Linking.openURL(mat.content).catch(() => toast.error("Tidak bisa buka URL"))}
-                        >
-                          <ExternalLink size={14} color="#fff" />
-                          <Text style={styles.openLinkBtnText}>Buka</Text>
-                        </TouchableOpacity>
-                      </View>
+                      <YoutubeEmbed url={mat.content} />
                     )}
 
                     {mat.type === "googledoc" && (
