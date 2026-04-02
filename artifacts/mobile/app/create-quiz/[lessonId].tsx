@@ -238,6 +238,17 @@ export default function CreateQuizScreen() {
       Alert.alert(t.create_qz.answer_label, t.create_qz.pick_answer);
       return;
     }
+    const confirmed = await new Promise<boolean>((res) =>
+      Alert.alert(
+        "Konfirmasi Tambah Soal",
+        `Tambahkan soal ini?\n\n"${question.trim()}"`,
+        [
+          { text: "Batal", style: "cancel", onPress: () => res(false) },
+          { text: "Tambah", style: "default", onPress: () => res(true) },
+        ]
+      )
+    );
+    if (!confirmed) return;
     setLoading(true);
     const id = generateId();
     let savedImage: string | undefined;
@@ -301,6 +312,17 @@ export default function CreateQuizScreen() {
         );
         return;
       }
+      const confirmed = await new Promise<boolean>((res) =>
+        Alert.alert(
+          "Konfirmasi Import",
+          `Import ${validItems.length} soal ke pelajaran ini?`,
+          [
+            { text: "Batal", style: "cancel", onPress: () => res(false) },
+            { text: "Import", style: "default", onPress: () => res(true) },
+          ]
+        )
+      );
+      if (!confirmed) return;
       if (packs.length > 0) {
         setPendingImportItems(validItems);
         setShowPackModal(true);
@@ -437,6 +459,17 @@ export default function CreateQuizScreen() {
       Alert.alert("Jawaban belum dipilih", "Pilih jawaban yang benar.");
       return;
     }
+    const confirmed = await new Promise<boolean>((res) =>
+      Alert.alert(
+        "Simpan Perubahan?",
+        "Perubahan pada soal ini akan disimpan permanen.",
+        [
+          { text: "Batal", style: "cancel", onPress: () => res(false) },
+          { text: "Simpan", style: "default", onPress: () => res(true) },
+        ]
+      )
+    );
+    if (!confirmed) return;
     setEditLoading(true);
     let savedImage: string | undefined = editImageUri ?? undefined;
     if (editImageUri && editImageUri !== editingQuiz.image) {
@@ -955,9 +988,16 @@ export default function CreateQuizScreen() {
           <Text style={styles.sectionTitle}>
             Soal yang Ada ({existing.length})
           </Text>
-          {(activePack ? existing.filter((q) => q.packId === activePack.id) : existing).map((q, i) => (
+          {(activePack ? existing.filter((q) => q.packId === activePack.id) : existing)
+            .filter((q) =>
+              q.question?.trim() &&
+              q.answer?.trim() &&
+              Array.isArray(q.options) &&
+              q.options.filter((o) => o?.trim()).length >= 2
+            )
+            .map((q, i) => (
             <View key={q.id} style={styles.questionRow}>
-              {q.image && (
+              {!!q.image && (
                 <Image
                   source={{ uri: q.image }}
                   style={styles.cardThumb}
@@ -967,7 +1007,16 @@ export default function CreateQuizScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.questionNum}>Soal {i + 1}</Text>
                 <Text style={styles.questionText}>{q.question}</Text>
-                <Text style={styles.questionAnswer}>✓ {q.answer}</Text>
+                {!!q.answer?.trim() && (
+                  <Text style={styles.questionAnswer}>✓ {q.answer}</Text>
+                )}
+                {q.options
+                  .filter((o) => o?.trim())
+                  .map((o, oi) => (
+                    <Text key={oi} style={[styles.questionAnswer, { color: Colors.textMuted, fontWeight: "500" }]}>
+                      {String.fromCharCode(65 + oi)}. {o}
+                    </Text>
+                  ))}
               </View>
               <View style={styles.cardActions}>
                 <TouchableOpacity

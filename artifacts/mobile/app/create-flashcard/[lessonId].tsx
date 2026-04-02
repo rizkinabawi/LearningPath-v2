@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import {
   X, Trash2, ChevronDown, ChevronUp, ImagePlus, Bot,
-  Copy, Check, Download,
+  Copy, Check, Download, PencilLine,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
@@ -160,6 +160,14 @@ export default function CreateFlashcardScreen() {
   const [newPackName, setNewPackName] = useState("");
   const [pendingImportItems, setPendingImportItems] = useState<any[]>([]);
 
+  // Edit card state
+  const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
+  const [editQuestion, setEditQuestion] = useState("");
+  const [editAnswer, setEditAnswer] = useState("");
+  const [editTag, setEditTag] = useState("");
+  const [editImageUri, setEditImageUri] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+
   // AI Prompt Builder state
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptTopic, setPromptTopic] = useState("");
@@ -207,6 +215,17 @@ export default function CreateFlashcardScreen() {
       Alert.alert(t.create_fc.question_ph, t.create_fc.fill_form);
       return;
     }
+    const confirmed = await new Promise<boolean>((res) =>
+      Alert.alert(
+        "Konfirmasi Tambah Kartu",
+        `Tambahkan flashcard ini?\n\nDepan: "${question.trim()}"`,
+        [
+          { text: "Batal", style: "cancel", onPress: () => res(false) },
+          { text: "Tambah", style: "default", onPress: () => res(true) },
+        ]
+      )
+    );
+    if (!confirmed) return;
     setLoading(true);
     const id = generateId();
     let savedImage: string | undefined;
@@ -242,6 +261,72 @@ export default function CreateFlashcardScreen() {
     toast.info(t.create_fc.deleted);
   };
 
+  const openEdit = (card: Flashcard) => {
+    setEditingCard(card);
+    setEditQuestion(card.question);
+    setEditAnswer(card.answer);
+    setEditTag(card.tag ?? "");
+    setEditImageUri(card.image ?? null);
+  };
+
+  const pickEditImage = async () => {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Izin Diperlukan", "Izinkan akses galeri untuk upload gambar.");
+        return;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setEditImageUri(result.assets[0].uri);
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (!editingCard) return;
+    if (!editQuestion.trim() || !editAnswer.trim()) {
+      Alert.alert("Form Tidak Lengkap", "Pertanyaan dan jawaban wajib diisi.");
+      return;
+    }
+    const confirmed = await new Promise<boolean>((res) =>
+      Alert.alert(
+        "Simpan Perubahan?",
+        "Perubahan pada kartu ini akan disimpan permanen.",
+        [
+          { text: "Batal", style: "cancel", onPress: () => res(false) },
+          { text: "Simpan", style: "default", onPress: () => res(true) },
+        ]
+      )
+    );
+    if (!confirmed) return;
+    setEditLoading(true);
+    let savedImage: string | undefined = editImageUri ?? undefined;
+    if (editImageUri && editImageUri !== editingCard.image) {
+      try {
+        savedImage = await saveImageToLocal(editImageUri, editingCard.id);
+      } catch {
+        savedImage = editImageUri;
+      }
+    }
+    const updated: Flashcard = {
+      ...editingCard,
+      question: editQuestion.trim(),
+      answer: editAnswer.trim(),
+      tag: editTag.trim(),
+      image: savedImage,
+    };
+    await saveFlashcard(updated);
+    setExisting((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+    setEditingCard(null);
+    setEditLoading(false);
+    toast.success("Kartu diperbarui");
+  };
+
   const processImportText = async (rawText: string) => {
     try {
       const extracted = extractJsonFromText(rawText);
@@ -271,6 +356,17 @@ export default function CreateFlashcardScreen() {
         return;
       }
 
+      const confirmed = await new Promise<boolean>((res) =>
+        Alert.alert(
+          "Konfirmasi Import",
+          `Import ${validItems.length} flashcard ke pelajaran ini?`,
+          [
+            { text: "Batal", style: "cancel", onPress: () => res(false) },
+            { text: "Import", style: "default", onPress: () => res(true) },
+          ]
+        )
+      );
+      if (!confirmed) return;
       if (packs.length > 0) {
         setPendingImportItems(validItems);
         setShowPackModal(true);
@@ -766,29 +862,128 @@ export default function CreateFlashcardScreen() {
       {existing.length > 0 && (
         <View style={styles.existingSection}>
           <Text style={styles.sectionTitle}>Flashcard yang Ada ({existing.length})</Text>
-          {existing.map((card) => (
+          {(activePack ? existing.filter((c) => c.packId === activePack.id) : existing)
+            .filter((card) => card.question?.trim() && card.answer?.trim())
+            .map((card) => (
             <View key={card.id} style={styles.cardRow}>
-              {card.image && (
+              {!!card.image && (
                 <Image source={{ uri: card.image }} style={styles.cardThumb} resizeMode="cover" />
               )}
               <View style={{ flex: 1 }}>
-                {card.tag ? <Text style={styles.cardTag}>{card.tag}</Text> : null}
+                {!!card.tag?.trim() && <Text style={styles.cardTag}>{card.tag}</Text>}
                 <Text style={styles.cardQ}>{card.question}</Text>
                 <Text style={styles.cardA}>{card.answer}</Text>
               </View>
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert(t.create_fc.delete_card_title, t.create_fc.delete_card_msg, [
-                    { text: t.common.cancel, style: "cancel" },
-                    { text: t.common.delete, style: "destructive", onPress: () => handleDelete(card.id) },
-                  ]);
-                }}
-                style={styles.deleteBtn}
-              >
-                <Trash2 size={16} color={Colors.danger} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                <TouchableOpacity
+                  onPress={() => openEdit(card)}
+                  style={[styles.deleteBtn, { backgroundColor: Colors.primaryLight }]}
+                >
+                  <PencilLine size={14} color={Colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    Alert.alert(t.create_fc.delete_card_title, t.create_fc.delete_card_msg, [
+                      { text: t.common.cancel, style: "cancel" },
+                      { text: t.common.delete, style: "destructive", onPress: () => handleDelete(card.id) },
+                    ]);
+                  }}
+                  style={styles.deleteBtn}
+                >
+                  <Trash2 size={14} color={Colors.danger} />
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
+        </View>
+      )}
+
+      {/* ── EDIT CARD MODAL ── */}
+      {editingCard && (
+        <View style={styles.modalOverlay}>
+          <ScrollView
+            style={{ width: "100%" }}
+            contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 40 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.editModalCard}>
+              {/* Header */}
+              <View style={styles.editModalHeader}>
+                <Text style={styles.editModalTitle}>Edit Flashcard</Text>
+                <TouchableOpacity onPress={() => setEditingCard(null)} style={styles.closeBtn}>
+                  <X size={18} color={Colors.dark} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Question */}
+              <Text style={styles.editFieldLabel}>Pertanyaan (Depan)</Text>
+              <TextInput
+                value={editQuestion}
+                onChangeText={setEditQuestion}
+                placeholder="Pertanyaan atau istilah..."
+                style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+                placeholderTextColor={Colors.textMuted}
+                multiline
+              />
+
+              {/* Answer */}
+              <Text style={[styles.editFieldLabel, { marginTop: 12 }]}>Jawaban (Belakang)</Text>
+              <TextInput
+                value={editAnswer}
+                onChangeText={setEditAnswer}
+                placeholder="Jawaban atau definisi..."
+                style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+                placeholderTextColor={Colors.textMuted}
+                multiline
+              />
+
+              {/* Tag */}
+              <Text style={[styles.editFieldLabel, { marginTop: 12 }]}>Tag / Kategori (opsional)</Text>
+              <TextInput
+                value={editTag}
+                onChangeText={setEditTag}
+                placeholder="Misal: Biologi, Bab 3..."
+                style={styles.input}
+                placeholderTextColor={Colors.textMuted}
+              />
+
+              {/* Image */}
+              <Text style={[styles.editFieldLabel, { marginTop: 12 }]}>Foto (opsional)</Text>
+              {editImageUri ? (
+                <View style={{ marginBottom: 8 }}>
+                  <Image source={{ uri: editImageUri }} style={{ width: "100%", height: 160, borderRadius: 12 }} resizeMode="cover" />
+                  <TouchableOpacity onPress={() => setEditImageUri(null)} style={{ marginTop: 6, alignSelf: "flex-end" }}>
+                    <Text style={{ color: Colors.danger, fontWeight: "700", fontSize: 13 }}>Hapus Foto</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={pickEditImage} style={styles.imgPickerBtn}>
+                  <ImagePlus size={18} color={Colors.primary} />
+                  <Text style={styles.imgPickerText}>Pilih Foto</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Actions */}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 20 }}>
+                <TouchableOpacity
+                  onPress={() => setEditingCard(null)}
+                  style={[styles.editActionBtn, { backgroundColor: Colors.background, flex: 1 }]}
+                >
+                  <Text style={[styles.editActionText, { color: Colors.textSecondary }]}>Batal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleEditSave}
+                  disabled={editLoading}
+                  style={[styles.editActionBtn, { backgroundColor: Colors.primary, flex: 2 }]}
+                >
+                  <Text style={[styles.editActionText, { color: Colors.white }]}>
+                    {editLoading ? "Menyimpan..." : "Simpan Perubahan"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
         </View>
       )}
     </KeyboardAwareScrollViewCompat>
@@ -1015,4 +1210,34 @@ const styles = StyleSheet.create({
   modalCreateBtnText: { fontSize: 14, fontWeight: "900", color: Colors.white },
   modalCancelBtn: { alignItems: "center", paddingVertical: 8 },
   modalCancelText: { fontSize: 14, fontWeight: "700", color: Colors.textMuted },
+
+  // Edit modal
+  editModalCard: {
+    backgroundColor: Colors.white, borderRadius: 24,
+    padding: 20, width: "100%",
+    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  editModalHeader: {
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", marginBottom: 16,
+  },
+  editModalTitle: { fontSize: 18, fontWeight: "900", color: Colors.dark },
+  editFieldLabel: {
+    fontSize: 11, fontWeight: "800", color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 1, marginBottom: 6,
+  },
+  editActionBtn: {
+    paddingVertical: 14, borderRadius: 14,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
+  editActionText: { fontSize: 14, fontWeight: "800" },
+  imgPickerBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    borderWidth: 1.5, borderColor: Colors.primary, borderStyle: "dashed",
+    borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14,
+    backgroundColor: Colors.primaryLight, marginBottom: 4,
+  },
+  imgPickerText: { fontSize: 13, fontWeight: "700", color: Colors.primary },
 });
