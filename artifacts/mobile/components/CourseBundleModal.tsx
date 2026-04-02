@@ -105,14 +105,17 @@ export function CourseBundleShareModal({ visible, onClose }: Props) {
         const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
         await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
         const assetMsg = assetSummary ? ` Sudah termasuk ${assetSummary}.` : "";
-        await Share.share({
-          url: fileUri,
-          title: `Bundle Kursus: ${pathName}`,
-          message:
-            `Hei! Aku mau berbagi kursus "${pathName}" denganmu. ` +
-            `Berisi ${pack.lessons?.length ?? 0} pelajaran, ${pack.flashcards?.length ?? 0} flashcard, dan ${pack.quizzes?.length ?? 0} soal quiz.${assetMsg} ` +
-            `Import file ini ke Mobile Learning App untuk langsung belajar! 🎓`,
-        });
+        const shareMsg =
+          `Bundle Kursus: ${pathName}\n` +
+          `${pack.lessons?.length ?? 0} pelajaran · ${pack.flashcards?.length ?? 0} flashcard · ${pack.quizzes?.length ?? 0} soal quiz.${assetMsg}\n` +
+          `Import file ini ke Mobile Learning App untuk langsung belajar!`;
+        // On iOS, passing both url and message suppresses the file attachment.
+        // Use url-only on iOS; use message+url on Android.
+        if (Platform.OS === "ios") {
+          await Share.share({ url: fileUri, title: `Bundle Kursus: ${pathName}` });
+        } else {
+          await Share.share({ url: fileUri, title: `Bundle Kursus: ${pathName}`, message: shareMsg });
+        }
       }
     } catch (e) {
       if (!isCancellationError(e)) console.warn("[CourseBundleModal] share error", e);

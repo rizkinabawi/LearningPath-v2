@@ -20,6 +20,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
 import { Button } from "@/components/Button";
 import {
   getFlashcards, saveFlashcard, deleteFlashcard,
@@ -58,6 +59,27 @@ const FC_LANG_LABELS: Record<string, string> = {
   "French": "French (Français)",
   "German": "German (Deutsch)",
   "Korean": "Korean (한국어)",
+};
+
+/** Robustly extract a JSON array or object from any AI response text */
+const extractJsonFromText = (text: string): string => {
+  const t = text.trim();
+  // 1. Strip markdown code fences (with optional text before them)
+  const fenceMatch = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch) return fenceMatch[1].trim();
+  // 2. Find first '[' or '{' and last ']' or '}'
+  const arrStart = t.indexOf("[");
+  const arrEnd = t.lastIndexOf("]");
+  const objStart = t.indexOf("{");
+  const objEnd = t.lastIndexOf("}");
+  // Prefer array if it appears first or if no object found
+  if (arrStart !== -1 && arrEnd !== -1 && (objStart === -1 || arrStart <= objStart)) {
+    return t.slice(arrStart, arrEnd + 1);
+  }
+  if (objStart !== -1 && objEnd !== -1) {
+    return t.slice(objStart, objEnd + 1);
+  }
+  return t;
 };
 
 const buildFlashcardPrompt = (
@@ -205,59 +227,72 @@ export default function CreateFlashcardScreen() {
     toast.info(t.create_fc.deleted);
   };
 
-  const handleImportJson = async () => {
+  const processImportText = async (rawText: string) => {
     try {
-      const cleaned = importJson
-        .trim()
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      const parsed = JSON.parse(cleaned);
+      const extracted = extractJsonFromText(rawText);
+      const parsed = JSON.parse(extracted);
 
       let rawItems: any[] = [];
       if (Array.isArray(parsed)) {
         rawItems = parsed;
       } else if (parsed && Array.isArray(parsed.items)) {
         rawItems = parsed.items;
-      } else {
+      } else if (parsed && Array.isArray(parsed.flashcards)) {
+        rawItems = parsed.flashcards;
+      } else if (parsed && typeof parsed === "object") {
         rawItems = [parsed];
       }
 
       const validItems = rawItems.filter(
-        (item) => (item.question ?? item.front) && (item.answer ?? item.back)
+        (item) => (item.question ?? item.front ?? item.pertanyaan) &&
+                  (item.answer ?? item.back ?? item.jawaban)
       );
 
       if (validItems.length === 0) {
         Alert.alert(
-          "Tidak Ada Data",
-          "Tidak ada flashcard valid ditemukan.\n\nPastikan format JSON:\n" +
-          '[{"question":"...","answer":"...","tag":"..."}]'
+          "Tidak Ada Data Valid",
+          "Tidak ada flashcard valid ditemukan.\n\nField yang dikenali: \"question\"/\"front\", \"answer\"/\"back\", \"tag\".\n\nPastikan AI menghasilkan array JSON dengan field yang benar."
         );
         return;
       }
 
-      // If packs exist → let user pick a pack; otherwise save directly
       if (packs.length > 0) {
         setPendingImportItems(validItems);
         setShowPackModal(true);
       } else {
-        // Save directly without a pack
         await doImport(validItems, undefined);
       }
-    } catch {
+    } catch (e) {
       Alert.alert(
         "JSON Tidak Valid",
-        'Format yang didukung:\n\n[{"question":"...","answer":"...","tag":"..."}]\n\nPastikan hasil dari AI sudah disalin lengkap.'
+        'Gagal membaca JSON.\n\nFormat yang didukung:\n[{"question":"...","answer":"...","tag":"..."}]\n\nPastikan hasil dari AI sudah disalin lengkap dan tidak ada teks tambahan.'
       );
+    }
+  };
+
+  const handleImportJson = () => processImportText(importJson);
+
+  const handlePickJsonFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/json", "text/plain", "*/*"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const text = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+      await processImportText(text);
+    } catch {
+      Alert.alert("Gagal Membaca File", "Tidak dapat membaca file JSON. Pastikan file berformat JSON yang valid.");
     }
   };
 
   const doImport = async (items: any[], packId: string | undefined) => {
     let count = 0;
     for (const item of items) {
-      const q = item.question ?? item.front ?? "";
-      const a = item.answer ?? item.back ?? "";
-      const t = item.tag ?? "";
+      const q = item.question ?? item.front ?? item.pertanyaan ?? "";
+      const a = item.answer ?? item.back ?? item.jawaban ?? "";
+      const t = item.tag ?? item.kategori ?? "";
       if (!String(q).trim()) continue;
       const card: Flashcard = {
         id: generateId(),
@@ -612,6 +647,14 @@ export default function CreateFlashcardScreen() {
 
       {showImport && (
         <View style={styles.importBox}>
+          {/* Upload file button */}
+          <TouchableOpacity onPress={handlePickJsonFile} style={styles.filePickBtn} activeOpacity={0.8}>
+            <Download size={16} color={Colors.primary} />
+            <Text style={styles.filePickText}>Upload File JSON (.json / .txt)</Text>
+          </TouchableOpacity>
+          <View style={styles.importOr}>
+            <View style={styles.importOrLine} /><Text style={styles.importOrText}>atau tempel teks</Text><View style={styles.importOrLine} />
+          </View>
           <Text style={styles.importHint}>Tempel hasil JSON dari AI di sini lalu tap Import</Text>
           <Text style={styles.importFormat}>
             Format: {`[{"question":"...","answer":"...","tag":"..."}]`}
@@ -854,6 +897,11 @@ const styles = StyleSheet.create({
   importBox: { gap: 8, marginBottom: 20 },
   importHint: { fontSize: 12, color: Colors.textMuted, fontWeight: "500", fontStyle: "italic" },
   importFormat: { fontSize: 11, color: Colors.textSecondary, fontWeight: "600", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+  filePickBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.card, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, borderStyle: "dashed" },
+  filePickText: { fontSize: 13, fontWeight: "600", color: Colors.primary, flex: 1 },
+  importOr: { flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 2 },
+  importOrLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  importOrText: { fontSize: 11, color: Colors.textMuted, fontWeight: "500" },
 
   // Divider
   divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 16 },

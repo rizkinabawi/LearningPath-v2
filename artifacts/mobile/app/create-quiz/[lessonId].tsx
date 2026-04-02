@@ -27,6 +27,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
 import { Button } from "@/components/Button";
 import {
   getQuizzes,
@@ -72,6 +73,24 @@ const QUIZ_LANG_LABELS: Record<string, string> = {
   "French": "French (Français)",
   "German": "German (Deutsch)",
   "Korean": "Korean (한국어)",
+};
+
+/** Robustly extract a JSON array or object from any AI response text */
+const extractJsonFromText = (text: string): string => {
+  const t = text.trim();
+  const fenceMatch = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch) return fenceMatch[1].trim();
+  const arrStart = t.indexOf("[");
+  const arrEnd = t.lastIndexOf("]");
+  const objStart = t.indexOf("{");
+  const objEnd = t.lastIndexOf("}");
+  if (arrStart !== -1 && arrEnd !== -1 && (objStart === -1 || arrStart <= objStart)) {
+    return t.slice(arrStart, arrEnd + 1);
+  }
+  if (objStart !== -1 && objEnd !== -1) {
+    return t.slice(objStart, objEnd + 1);
+  }
+  return t;
 };
 
 const buildAIPrompt = (
@@ -245,27 +264,24 @@ export default function CreateQuizScreen() {
     );
   };
 
-  const handleImportJson = async () => {
+  const processImportText = async (rawText: string) => {
     try {
-      const cleaned = importJson.trim()
-        .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-      const parsed = JSON.parse(cleaned);
+      const extracted = extractJsonFromText(rawText);
+      const parsed = JSON.parse(extracted);
       let rawItems: any[] = [];
       if (Array.isArray(parsed)) rawItems = parsed;
       else if (parsed && Array.isArray(parsed.items)) rawItems = parsed.items;
-      else rawItems = [parsed];
+      else if (parsed && Array.isArray(parsed.quizzes)) rawItems = parsed.quizzes;
+      else if (parsed && typeof parsed === "object") rawItems = [parsed];
 
       const validItems = parseValidQuizItems(rawItems);
       if (validItems.length === 0) {
         Alert.alert(
           "Tidak Ada Soal Valid",
-          'Tidak ada soal valid ditemukan.\n\nPastikan format JSON:\n' +
-          '[{"question":"...","options":[...],"correct_answer":"...","explanation":"..."}]\n\n' +
-          'Field "correct_answer" harus identik dengan salah satu opsi.'
+          'Tidak ada soal valid ditemukan.\n\nField yang dikenali:\n- "question" (pertanyaan)\n- "options" (array pilihan)\n- "correct_answer" atau "answer" (jawaban benar)\n\nPastikan AI menghasilkan format yang benar.'
         );
         return;
       }
-      // If packs exist → let user pick; otherwise save directly
       if (packs.length > 0) {
         setPendingImportItems(validItems);
         setShowPackModal(true);
@@ -275,8 +291,25 @@ export default function CreateQuizScreen() {
     } catch {
       Alert.alert(
         "JSON Tidak Valid",
-        'Format yang didukung:\n\n[{"question":"...","options":[...],"correct_answer":"...","explanation":"..."}]\n\nPastikan hasil dari AI sudah disalin lengkap.'
+        'Gagal membaca JSON.\n\nFormat yang didukung:\n[{"question":"...","options":["A","B","C","D"],"correct_answer":"A","explanation":"..."}]\n\nPastikan hasil dari AI sudah disalin lengkap.'
       );
+    }
+  };
+
+  const handleImportJson = () => processImportText(importJson);
+
+  const handlePickJsonFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/json", "text/plain", "*/*"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const text = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+      await processImportText(text);
+    } catch {
+      Alert.alert("Gagal Membaca File", "Tidak dapat membaca file JSON. Pastikan file berformat JSON yang valid.");
     }
   };
 
@@ -685,17 +718,25 @@ export default function CreateQuizScreen() {
 
       {showImport && (
         <View style={styles.importBox}>
+          {/* Upload file button */}
+          <TouchableOpacity onPress={handlePickJsonFile} style={styles.filePickBtn} activeOpacity={0.8}>
+            <Download size={16} color={Colors.primary} />
+            <Text style={styles.filePickText}>Upload File JSON (.json / .txt)</Text>
+          </TouchableOpacity>
+          <View style={styles.importOr}>
+            <View style={styles.importOrLine} /><Text style={styles.importOrText}>atau tempel teks</Text><View style={styles.importOrLine} />
+          </View>
           <Text style={styles.importHint}>
             Tempel hasil JSON dari AI di sini lalu tap Import
           </Text>
           <Text style={styles.importFormat}>
-            Format: {`[{"question":"...","options":["A","B","C","D"],"answer":"A"}]`}
+            Format: {`[{"question":"...","options":[...],"correct_answer":"..."}]`}
           </Text>
           <TextInput
             value={importJson}
             onChangeText={setImportJson}
             style={[styles.input, { height: 140, textAlignVertical: "top" }]}
-            placeholder={`[\n  {\n    "question": "...",\n    "options": ["A","B","C","D"],\n    "answer": "A"\n  }\n]`}
+            placeholder={`[\n  {\n    "question": "...",\n    "options": ["A","B","C","D"],\n    "correct_answer": "A"\n  }\n]`}
             placeholderTextColor={Colors.textMuted}
             multiline
             autoCapitalize="none"
@@ -1087,6 +1128,11 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontStyle: "italic",
   },
+  filePickBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.background, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, borderStyle: "dashed" },
+  filePickText: { fontSize: 13, fontWeight: "600", color: Colors.primary, flex: 1 },
+  importOr: { flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 2 },
+  importOrLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  importOrText: { fontSize: 11, color: Colors.textMuted, fontWeight: "500" },
 
   // Divider
   divider: {
