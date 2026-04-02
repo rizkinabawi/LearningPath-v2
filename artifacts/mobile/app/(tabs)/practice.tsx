@@ -45,10 +45,10 @@ export default function PracticeTab() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
-  const pad = isTablet ? 32 : 16;
+  const SCROLL_PAD = 20; // matches styles.scroll padding
   const modeCardWidth = isTablet
-    ? (width - pad * 2 - 10) / 4   // 4 kolom di tablet
-    : (width - pad * 2 - 10) / 2;  // 2 kolom di hp
+    ? (width - 64 - 10) / 4        // 4 kolom di tablet (pad 32*2)
+    : (width - SCROLL_PAD * 2 - 10) / 2; // 2 kolom di hp
   const [paths, setPaths] = useState<LearningPath[]>([]);
   const [cardCount, setCardCount] = useState(0);
   const [quizCount, setQuizCount] = useState(0);
