@@ -8,6 +8,7 @@ export interface User {
   goal: string;
   topic: string;
   level: "beginner" | "intermediate" | "advanced";
+  avatar?: string;
   createdAt: string;
 }
 

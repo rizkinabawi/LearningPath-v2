@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, Platform, Share,
-  ActivityIndicator, Switch, useWindowDimensions,
+  ActivityIndicator, Switch, useWindowDimensions, Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -124,6 +124,24 @@ export default function ProfileTab() {
 
   const MENU = [
     {
+      icon: "user" as const, label: "Edit Profil",
+      sub: "Ubah nama, foto, level & target belajar",
+      color: Colors.primary,
+      onPress: () => router.push("/edit-profile"),
+    },
+    {
+      icon: "package" as const, label: "Pack Manager",
+      sub: "Kelola pack flashcard & quiz kamu",
+      color: "#8B5CF6",
+      onPress: () => router.push("/pack-manager"),
+    },
+    {
+      icon: "image" as const, label: "Image Manager",
+      sub: "Lihat & hapus gambar tersimpan",
+      color: "#0EA5E9",
+      onPress: () => router.push("/image-manager"),
+    },
+    {
       icon: "share-2" as const, label: t.profile.share_bundle,
       sub: t.profile.share_bundle_sub,
       color: Colors.teal,
@@ -217,9 +235,16 @@ export default function ProfileTab() {
 
         {/* Avatar + name */}
         <View style={styles.heroRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
+          <TouchableOpacity style={styles.avatar} onPress={() => router.push("/edit-profile")} activeOpacity={0.85}>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
+            ) : (
+              <Text style={styles.avatarText}>{initial}</Text>
+            )}
+            <View style={styles.avatarEditBadge}>
+              <Feather name="camera" size={9} color="#fff" />
+            </View>
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{user?.name ?? "Learner"}</Text>
             <View style={styles.badges}>
@@ -233,7 +258,7 @@ export default function ProfileTab() {
               </View>
             </View>
           </View>
-          <TouchableOpacity style={styles.editBtn}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => router.push("/edit-profile")}>
             <Feather name="edit-2" size={16} color="rgba(255,255,255,0.8)" />
           </TouchableOpacity>
         </View>
@@ -479,8 +504,16 @@ const styles = StyleSheet.create({
   blob1: { position: "absolute", width: 180, height: 180, borderRadius: 90, backgroundColor: "rgba(255,255,255,0.08)", top: -50, right: -50 },
   blob2: { position: "absolute", width: 100, height: 100, borderRadius: 50, backgroundColor: "rgba(255,255,255,0.06)", bottom: 20, left: 20 },
   heroRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 22 },
-  avatar: { width: 68, height: 68, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.35)" },
+  avatar: { width: 68, height: 68, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.35)", overflow: "hidden", position: "relative" },
+  avatarImg: { width: 68, height: 68, borderRadius: 20 },
   avatarText: { fontSize: 28, fontWeight: "900", color: "#fff" },
+  avatarEditBadge: {
+    position: "absolute", bottom: 2, right: 2,
+    width: 18, height: 18, borderRadius: 6,
+    backgroundColor: "rgba(76,111,255,0.9)",
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.6)",
+  },
   name: { fontSize: 22, fontWeight: "900", color: "#fff", marginBottom: 8 },
   badges: { flexDirection: "row", gap: 8 },
   badge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(76,111,255,0.35)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
