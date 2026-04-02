@@ -1,0 +1,231 @@
+{
+“course_name”: “Dasar-Dasar Python untuk Pemula”,
+“course_description”: “Kursus ini membantu pemula memahami dasar-dasar Python dari nol hingga mampu membuat program sederhana.”,
+“tags”: [“python”, “programming”, “pemula”],
+“modules”: [
+{
+“module_name”: “Pengenalan Python”,
+“module_description”: “Memahami apa itu Python dan cara memulai.”,
+“module_order”: 1,
+“lessons”: [
+{
+“lesson_name”: “Apa itu Python”,
+“lesson_description”: “Penjelasan dasar tentang Python.”,
+“lesson_order”: 1,
+“type”: “article”,
+“contents”: [
+{
+“title”: “Pengertian Python”,
+“type”: “text”,
+“value”: “Python adalah bahasa pemrograman yang mudah dipelajari dan digunakan untuk berbagai kebutuhan seperti web, data, dan AI.”
+}
+]
+},
+{
+“lesson_name”: “Instalasi Python”,
+“lesson_description”: “Cara menginstall Python.”,
+“lesson_order”: 2,
+“type”: “video”,
+“contents”: [
+{
+“title”: “Tutorial Instalasi Python”,
+“type”: “video”,
+“value”: “https://www.youtube.com/watch?v=YYXdXT2l-Gg”
+}
+]
+}
+]
+},
+{
+“module_name”: “Dasar Sintaks Python”,
+“module_description”: “Memahami sintaks dasar Python.”,
+“module_order”: 2,
+“lessons”: [
+{
+“lesson_name”: “Variabel dan Tipe Data”,
+“lesson_description”: “Belajar variabel dan tipe data.”,
+“lesson_order”: 1,
+“type”: “article”,
+“contents”: [
+{
+“title”: “Contoh Variabel”,
+“type”: “code”,
+“value”: “nama = "Budi"\numur = 20”
+}
+]
+},
+{
+“lesson_name”: “Operator”,
+“lesson_description”: “Memahami operator dasar.”,
+“lesson_order”: 2,
+“type”: “article”,
+“contents”: [
+{
+“title”: “Operator Aritmatika”,
+“type”: “text”,
+“value”: “Operator digunakan untuk melakukan operasi seperti tambah, kurang, kali, dan bagi.”
+}
+]
+},
+{
+“lesson_name”: “Quiz Dasar”,
+“lesson_description”: “Latihan pemahaman dasar.”,
+“lesson_order”: 3,
+“type”: “quiz”,
+“contents”: [
+{
+“title”: “Ringkasan”,
+“type”: “text”,
+“value”: “Variabel menyimpan data, operator digunakan untuk manipulasi data.”
+}
+]
+}
+]
+},
+{
+“module_name”: “Kontrol Alur Program”,
+“module_description”: “Mengatur alur eksekusi program.”,
+“module_order”: 3,
+“lessons”: [
+{
+“lesson_name”: “If Else”,
+“lesson_description”: “Percabangan kondisi.”,
+“lesson_order”: 1,
+“type”: “article”,
+“contents”: [
+{
+“title”: “Contoh If”,
+“type”: “code”,
+“value”: “if umur > 18:\n    print("Dewasa")”
+}
+]
+},
+{
+“lesson_name”: “Perulangan”,
+“lesson_description”: “Looping dengan for dan while.”,
+“lesson_order”: 2,
+“type”: “video”,
+“contents”: [
+{
+“title”: “Loop Python”,
+“type”: “video”,
+“value”: “https://www.youtube.com/watch?v=6iF8Xb7Z3wQ”
+}
+]
+}
+]
+},
+{
+“module_name”: “Struktur Data”,
+“module_description”: “Belajar struktur data dasar.”,
+“module_order”: 4,
+“lessons”: [
+{
+“lesson_name”: “List”,
+“lesson_description”: “Penggunaan list.”,
+“lesson_order”: 1,
+“type”: “article”,
+“contents”: [
+{
+“title”: “Contoh List”,
+“type”: “code”,
+“value”: “buah = ["apel", "jeruk", "mangga"]”
+}
+]
+},
+{
+“lesson_name”: “Dictionary”,
+“lesson_description”: “Penggunaan dictionary.”,
+“lesson_order”: 2,
+“type”: “article”,
+“contents”: [
+{
+“title”: “Contoh Dictionary”,
+“type”: “code”,
+“value”: “data = {"nama": "Budi", "umur": 20}”
+}
+]
+},
+{
+“lesson_name”: “Flashcard Struktur Data”,
+“lesson_description”: “Review konsep.”,
+“lesson_order”: 3,
+“type”: “flashcard”,
+“contents”: [
+{
+“title”: “Ringkasan”,
+“type”: “text”,
+“value”: “List untuk data berurutan, dictionary untuk pasangan key-value.”
+}
+]
+}
+]
+},
+{
+“module_name”: “Fungsi”,
+“module_description”: “Membuat dan menggunakan fungsi.”,
+“module_order”: 5,
+“lessons”: [
+{
+“lesson_name”: “Definisi Fungsi”,
+“lesson_description”: “Cara membuat fungsi.”,
+“lesson_order”: 1,
+“type”: “article”,
+“contents”: [
+{
+“title”: “Contoh Fungsi”,
+“type”: “code”,
+“value”: “def sapa():\n    print("Halo")”
+}
+]
+},
+{
+“lesson_name”: “Parameter Fungsi”,
+“lesson_description”: “Menggunakan parameter.”,
+“lesson_order”: 2,
+“type”: “article”,
+“contents”: [
+{
+“title”: “Contoh Parameter”,
+“type”: “code”,
+“value”: “def sapa(nama):\n    print("Halo", nama)”
+}
+]
+}
+]
+},
+{
+“module_name”: “Project Sederhana”,
+“module_description”: “Menerapkan semua konsep.”,
+“module_order”: 6,
+“lessons”: [
+{
+“lesson_name”: “Membuat Kalkulator”,
+“lesson_description”: “Project kalkulator sederhana.”,
+“lesson_order”: 1,
+“type”: “project”,
+“contents”: [
+{
+“title”: “Kode Kalkulator”,
+“type”: “code”,
+“value”: “a = int(input())\nb = int(input())\nprint(a + b)”
+}
+]
+},
+{
+“lesson_name”: “Penjelasan Project”,
+“lesson_description”: “Penjelasan hasil project.”,
+“lesson_order”: 2,
+“type”: “video”,
+“contents”: [
+{
+“title”: “Project Python”,
+“type”: “video”,
+“value”: “https://www.youtube.com/watch?v=rfscVS0vtbw”
+}
+]
+}
+]
+}
+]
+}

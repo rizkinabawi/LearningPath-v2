@@ -85,28 +85,63 @@ interface PreviewData {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const normalizeJson = (raw: string): string =>
-  raw
-    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
-    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+/** Strip invisible/control characters and normalize line endings */
+const cleanInvisible = (s: string): string =>
+  s
     .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, " ")
     .replace(/[\u2028\u2029]/g, "\n")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n");
 
-const extractJson = (text: string): string => {
-  const t = normalizeJson(text).trim();
-  const fenceMatch = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenceMatch) return normalizeJson(fenceMatch[1]).trim();
-  const arrStart = t.indexOf("[");
-  const objStart = t.indexOf("{");
-  const arrEnd = t.lastIndexOf("]");
-  const objEnd = t.lastIndexOf("}");
-  if (objStart !== -1 && objEnd !== -1 && (arrStart === -1 || objStart <= arrStart)) {
-    return t.slice(objStart, objEnd + 1);
-  }
-  if (arrStart !== -1 && arrEnd !== -1) return t.slice(arrStart, arrEnd + 1);
-  return t;
+/** Try JSON.parse; return null on failure */
+const tryParse = (s: string): any => {
+  try { return JSON.parse(s); } catch { return null; }
+};
+
+/**
+ * Robustly repair & parse AI-generated JSON.
+ * Tries multiple strategies in order:
+ *   1. As-is (after stripping invisible chars + code fences)
+ *   2. Smart/curly quotes → escaped \" (AI uses them for code snippets inside strings)
+ *   3. Smart/curly quotes → straight " (structural quotes fallback)
+ */
+const repairAndParse = (raw: string): any => {
+  let s = cleanInvisible(raw).trim();
+
+  // Strip markdown code fences
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = cleanInvisible(fence[1]).trim();
+
+  // Extract outer JSON object/array
+  const extractOuter = (src: string): string => {
+    const obj = src.indexOf("{");
+    const arr = src.indexOf("[");
+    const objE = src.lastIndexOf("}");
+    const arrE = src.lastIndexOf("]");
+    if (obj !== -1 && objE !== -1 && (arr === -1 || obj <= arr)) return src.slice(obj, objE + 1);
+    if (arr !== -1 && arrE !== -1) return src.slice(arr, arrE + 1);
+    return src;
+  };
+
+  const core = extractOuter(s);
+
+  // Strategy 1: as-is
+  let result = tryParse(core);
+  if (result) return result;
+
+  // Strategy 2: curly double quotes → escaped \" (for code/content inside strings)
+  const escaped = core.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '\\"');
+  result = tryParse(escaped);
+  if (result) return result;
+
+  // Strategy 3: curly double quotes → straight " (structural quotes)
+  const normalized = core.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
+  result = tryParse(normalized);
+  if (result) return result;
+
+  // Strategy 4: also normalize smart single quotes
+  const fullNorm = normalized.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+  return tryParse(fullNorm);
 };
 
 const slugify = (s: string) =>
@@ -220,13 +255,13 @@ export default function ImportRoadmapScreen() {
   // ── JSON parse ──────────────────────────────────────────────────────────────
   const parseRoadmap = (raw: string): RoadmapJson | null => {
     try {
-      const extracted = extractJson(raw);
-      const parsed = JSON.parse(extracted);
+      const parsed = repairAndParse(raw);
+      if (!parsed) throw new Error("JSON tidak dapat dibaca. Pastikan output AI berformat JSON valid.");
 
       // Support single course or array of courses (take first if array)
       const data: RoadmapJson = Array.isArray(parsed) ? parsed[0] : parsed;
 
-      if (!data?.course_name) throw new Error("Field 'course_name' tidak ditemukan.");
+      if (!data?.course_name) throw new Error("Field 'course_name' tidak ditemukan dalam JSON.");
       if (!Array.isArray(data.modules) || data.modules.length === 0) {
         throw new Error("Field 'modules' kosong atau tidak ditemukan.");
       }
