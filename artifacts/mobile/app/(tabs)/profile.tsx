@@ -19,6 +19,7 @@ import {
   type ReminderSettings,
 } from "@/utils/notifications";
 import { CourseBundleShareModal, CourseImportPreviewModal } from "@/components/CourseBundleModal";
+import { extractAssetsFromPack } from "@/utils/bundle-assets";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
 
 export default function ProfileTab() {
@@ -78,9 +79,13 @@ export default function ProfileTab() {
         Alert.alert("Format Tidak Valid", "File bukan bundle kursus yang valid. Pastikan file dibuat dari fitur 'Bagikan Bundle Kursus'.");
         return;
       }
-      setImportPreviewPack(pack as CoursePack);
+      setImporting(true);
+      const extractedPack = await extractAssetsFromPack(pack as CoursePack);
+      setImporting(false);
+      setImportPreviewPack(extractedPack);
       setShowImportPreview(true);
     } catch {
+      setImporting(false);
       Alert.alert("Gagal Membaca File", "Tidak dapat membaca file. Pastikan format JSON valid.");
     }
   };

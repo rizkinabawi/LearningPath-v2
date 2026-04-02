@@ -122,7 +122,7 @@ export interface StudyMaterial {
 
 // Course Pack for export/import
 export interface CoursePack {
-  version: number;
+  version: number;           // 1 = no assets, 2 = base64 assets embedded
   exportedAt: string;
   paths: LearningPath[];
   modules: Module[];
@@ -133,6 +133,7 @@ export interface CoursePack {
   quizzes: Quiz[];
   materials: StudyMaterial[];
   notes: Note[];
+  assetData?: Record<string, string>; // originalUri → base64 (version 2+)
 }
 
 const STORAGE_KEYS = {

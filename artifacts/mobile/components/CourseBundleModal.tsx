@@ -7,9 +7,10 @@ import * as FileSystem from "expo-file-system";
 import { Feather } from "@expo/vector-icons";
 import {
   getLearningPaths, getModules, getLessons, getFlashcards, getQuizzes,
-  getNotes, getStudyMaterials, getFlashcardPacks, getQuizPacks, exportCourse,
+  exportCourse,
   type LearningPath, type CoursePack,
 } from "@/utils/storage";
+import { embedAssetsInPack, countEmbeddedAssets } from "@/utils/bundle-assets";
 import Colors, { shadowSm } from "@/constants/colors";
 
 interface PathStat {
@@ -28,6 +29,7 @@ interface Props {
 export function CourseBundleShareModal({ visible, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState<string | null>(null);
+  const [sharingStep, setSharingStep] = useState<string>("");
   const [pathStats, setPathStats] = useState<PathStat[]>([]);
 
   useEffect(() => {
@@ -71,13 +73,27 @@ export function CourseBundleShareModal({ visible, onClose }: Props) {
     const id = pathId ?? "all";
     setSharing(id);
     try {
-      const pack = await exportCourse(pathId);
-      const json = JSON.stringify(pack, null, 2);
+      setSharingStep("Memuat data kursus...");
+      const rawPack = await exportCourse(pathId);
+
+      setSharingStep("Menyiapkan gambar & file...");
+      const pack = await embedAssetsInPack(rawPack);
+
+      setSharingStep("Membuat file bundle...");
+      const json = JSON.stringify(pack);
       const pathName = pathId
         ? (pathStats.find((s) => s.path.id === pathId)?.path.name ?? "kursus")
         : "semua-kursus";
       const filename = `bundle-${pathName.replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.json`;
 
+      const assets = countEmbeddedAssets(pack);
+      const assetSummary = [
+        assets.images > 0 ? `${assets.images} gambar` : "",
+        assets.files > 0 ? `${assets.files} file` : "",
+        assets.links > 0 ? `${assets.links} link` : "",
+      ].filter(Boolean).join(", ");
+
+      setSharingStep("Membagikan...");
       if (Platform.OS === "web") {
         const blob = new Blob([json], { type: "application/json" });
         const url = URL.createObjectURL(blob);
@@ -87,12 +103,13 @@ export function CourseBundleShareModal({ visible, onClose }: Props) {
       } else {
         const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
         await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+        const assetMsg = assetSummary ? ` Sudah termasuk ${assetSummary}.` : "";
         await Share.share({
           url: fileUri,
           title: `Bundle Kursus: ${pathName}`,
           message:
             `Hei! Aku mau berbagi kursus "${pathName}" denganmu. ` +
-            `Berisi ${pack.lessons?.length ?? 0} pelajaran, ${pack.flashcards?.length ?? 0} flashcard, dan ${pack.quizzes?.length ?? 0} soal quiz. ` +
+            `Berisi ${pack.lessons?.length ?? 0} pelajaran, ${pack.flashcards?.length ?? 0} flashcard, dan ${pack.quizzes?.length ?? 0} soal quiz.${assetMsg} ` +
             `Import file ini ke Mobile Learning App untuk langsung belajar! 🎓`,
         });
       }
@@ -100,6 +117,7 @@ export function CourseBundleShareModal({ visible, onClose }: Props) {
       // silently fail
     } finally {
       setSharing(null);
+      setSharingStep("");
     }
   };
 
@@ -116,8 +134,16 @@ export function CourseBundleShareModal({ visible, onClose }: Props) {
           </TouchableOpacity>
         </View>
         <Text style={styles.subtitle}>
-          Teman kamu bisa langsung import dan semua kursus, modul, pelajaran, flashcard, dan quiz akan otomatis dibuat!
+          Gambar, file, dan link materi belajar ikut dibundel. Teman cukup import satu file dan semua struktur kursus otomatis terbuat!
         </Text>
+
+        {/* Sharing progress step */}
+        {sharing !== null && sharingStep ? (
+          <View style={styles.stepBanner}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.stepText}>{sharingStep}</Text>
+          </View>
+        ) : null}
 
         {loading ? (
           <View style={styles.loadingWrap}>
@@ -240,6 +266,10 @@ export function CourseImportPreviewModal({ visible, pack, importing, onConfirm, 
     ? new Date(pack.exportedAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
     : "Tidak diketahui";
 
+  const assets = countEmbeddedAssets(pack);
+  const hasAssets = assets.images > 0 || assets.files > 0 || assets.links > 0;
+  const isV2 = pack.version >= 2;
+
   return (
     <View style={styles.overlay}>
       <View style={[styles.sheet, styles.importSheet]}>
@@ -251,6 +281,16 @@ export function CourseImportPreviewModal({ visible, pack, importing, onConfirm, 
           </TouchableOpacity>
         </View>
         <Text style={styles.subtitle}>Berikut isi bundle yang akan diimport ke akunmu:</Text>
+
+        {/* Asset badge */}
+        {hasAssets && (
+          <View style={styles.assetBadgeRow}>
+            {assets.images > 0 && <AssetBadge icon="image" label={`${assets.images} gambar`} color="#8B5CF6" />}
+            {assets.files > 0 && <AssetBadge icon="file" label={`${assets.files} file`} color={Colors.teal} />}
+            {assets.links > 0 && <AssetBadge icon="link" label={`${assets.links} link`} color={Colors.primary} />}
+            {isV2 && <AssetBadge icon="check-circle" label="Aset disertakan" color={Colors.success} />}
+          </View>
+        )}
 
         {/* Course list */}
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 220 }}>
@@ -321,6 +361,15 @@ function PreviewStat({ label, val, color }: { label: string; val: number; color:
     <View style={[styles.previewStat, { backgroundColor: color + "15" }]}>
       <Text style={[styles.previewStatVal, { color }]}>{val}</Text>
       <Text style={[styles.previewStatLabel, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
+function AssetBadge({ icon, label, color }: { icon: string; label: string; color: string }) {
+  return (
+    <View style={[styles.assetBadge, { backgroundColor: color + "18", borderColor: color + "40" }]}>
+      <Feather name={icon as any} size={11} color={color} />
+      <Text style={[styles.assetBadgeText, { color }]}>{label}</Text>
     </View>
   );
 }
@@ -431,4 +480,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, flexDirection: "row", justifyContent: "center", gap: 8,
   },
   confirmBtnText: { fontSize: 14, fontWeight: "900", color: Colors.white },
+
+  stepBanner: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: Colors.primaryLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    marginBottom: 10,
+  },
+  stepText: { fontSize: 12, fontWeight: "600", color: Colors.primary, flex: 1 },
+
+  assetBadgeRow: {
+    flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10,
+  },
+  assetBadge: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+    borderWidth: 1,
+  },
+  assetBadgeText: { fontSize: 11, fontWeight: "700" },
 });
