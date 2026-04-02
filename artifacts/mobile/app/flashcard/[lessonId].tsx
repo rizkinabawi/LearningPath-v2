@@ -319,13 +319,6 @@ export default function FlashcardScreen() {
               { opacity: flipped ? 1 : 0, position: "absolute", top: 0 },
             ]}
           >
-            {card.image && flipped && (
-              <Image
-                source={{ uri: card.image }}
-                style={styles.cardImage}
-                resizeMode="cover"
-              />
-            )}
             <Text style={styles.cardHint}>Jawaban</Text>
             <Text style={styles.cardText}>{card.answer}</Text>
           </Animated.View>

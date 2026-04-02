@@ -645,7 +645,7 @@ export default function StudyMaterialScreen() {
                         <Image
                           source={{ uri: mat.filePath }}
                           style={styles.materialImage}
-                          resizeMode="cover"
+                          resizeMode="contain"
                         />
                       </View>
                     )}
@@ -1046,8 +1046,8 @@ const styles = StyleSheet.create({
   openLinkBtnText: { fontSize: 11, fontWeight: "800", color: "#fff" },
 
   // Image display
-  imageBox: { borderRadius: 12, overflow: "hidden" },
-  materialImage: { width: "100%", height: 200, borderRadius: 12 },
+  imageBox: { borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0" },
+  materialImage: { width: "100%", aspectRatio: 4 / 3, borderRadius: 12 },
 
   // Picked image in modal
   pickedImageWrap: { gap: 8, marginTop: 6 },
