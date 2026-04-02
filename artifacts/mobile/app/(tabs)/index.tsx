@@ -14,8 +14,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import {
-  getUser, getLearningPaths, getStats, getWrongAnswers,
-  type User, type LearningPath, type Stats,
+  getUser, getLearningPaths, getModules, getLessons, getStats, getWrongAnswers,
+  type User, type LearningPath, type Module, type Lesson, type Stats,
 } from "@/utils/storage";
 import Colors, { shadow, shadowSm, CARD_GRADIENTS } from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -50,16 +50,18 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [paths, setPaths] = useState<LearningPath[]>([]);
+  const [allModules, setAllModules] = useState<Module[]>([]);
+  const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [wrongCount, setWrongCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = async () => {
-    const [u, p, s, w] = await Promise.all([
-      getUser(), getLearningPaths(), getStats(), getWrongAnswers(),
+    const [u, p, mods, lessons, s, w] = await Promise.all([
+      getUser(), getLearningPaths(), getModules(), getLessons(), getStats(), getWrongAnswers(),
     ]);
     if (!u) { router.replace("/onboarding"); return; }
-    setUser(u); setPaths(p); setStats(s); setWrongCount(w.length);
+    setUser(u); setPaths(p); setAllModules(mods); setAllLessons(lessons); setStats(s); setWrongCount(w.length);
   };
 
   useFocusEffect(useCallback(() => { load(); }, []));
@@ -223,42 +225,79 @@ export default function Dashboard() {
           </View>
 
           {paths.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.courseScroll}
-            >
-              {paths.map((path, i) => (
-                <TouchableOpacity
-                  key={path.id}
-                  activeOpacity={0.85}
-                  onPress={() => router.push("/(tabs)/learn")}
-                  style={[styles.courseCard, shadowSm]}
-                >
-                  <LinearGradient
-                    colors={CARD_GRADIENTS[i % CARD_GRADIENTS.length]}
-                    style={styles.courseIconBg}
+            <View style={styles.courseList}>
+              {paths.slice(0, 4).map((path, i) => {
+                const pathMods = allModules.filter((m) => m.pathId === path.id);
+                const modIds = new Set(pathMods.map((m) => m.id));
+                const pathLessons = allLessons.filter((l) => modIds.has(l.moduleId));
+                const grad = CARD_GRADIENTS[i % CARD_GRADIENTS.length];
+                const icon = COURSE_ICONS[i % COURSE_ICONS.length];
+                return (
+                  <TouchableOpacity
+                    key={path.id}
+                    activeOpacity={0.88}
+                    onPress={() => router.push("/(tabs)/learn")}
+                    style={[styles.courseCard, shadowSm]}
                   >
-                    <Feather name={COURSE_ICONS[i % COURSE_ICONS.length]} size={18} color="#fff" />
-                  </LinearGradient>
-                  <Text style={styles.courseName} numberOfLines={2}>{path.name}</Text>
-                  <Text style={styles.courseSub} numberOfLines={1}>{path.description || "—"}</Text>
-                  <View style={styles.courseArrow}>
-                    <Feather name="chevron-right" size={12} color={Colors.textMuted} />
-                  </View>
+                    {/* Left gradient icon panel */}
+                    <LinearGradient colors={grad} style={styles.courseCardGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                      <Feather name={icon} size={24} color="#fff" />
+                    </LinearGradient>
+
+                    {/* Content */}
+                    <View style={styles.courseCardBody}>
+                      <Text style={styles.courseName} numberOfLines={1}>{path.name}</Text>
+                      {!!path.description && (
+                        <Text style={styles.courseSub} numberOfLines={1}>{path.description}</Text>
+                      )}
+                      {/* Stats row */}
+                      <View style={styles.courseStatRow}>
+                        <View style={styles.courseStatChip}>
+                          <Feather name="layers" size={10} color={grad[0]} />
+                          <Text style={[styles.courseStatText, { color: grad[0] }]}>{pathMods.length} modul</Text>
+                        </View>
+                        <View style={styles.courseStatChip}>
+                          <Feather name="book-open" size={10} color={grad[0]} />
+                          <Text style={[styles.courseStatText, { color: grad[0] }]}>{pathLessons.length} pelajaran</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Right arrow */}
+                    <View style={styles.courseCardArrow}>
+                      <LinearGradient colors={grad} style={styles.courseArrowCircle} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                        <Feather name="chevron-right" size={14} color="#fff" />
+                      </LinearGradient>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Show more link if more than 4 paths */}
+              {paths.length > 4 && (
+                <TouchableOpacity
+                  onPress={() => router.push("/(tabs)/learn")}
+                  style={styles.courseShowMore}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.courseShowMoreText}>Lihat {paths.length - 4} kursus lainnya</Text>
+                  <Feather name="chevron-right" size={13} color={Colors.primary} />
                 </TouchableOpacity>
-              ))}
+              )}
+
+              {/* Add new course button */}
               <TouchableOpacity
                 onPress={() => router.push("/(tabs)/learn")}
                 style={[styles.courseCardAdd, shadowSm]}
                 activeOpacity={0.8}
               >
                 <View style={styles.courseAddIcon}>
-                  <Feather name="plus" size={20} color={Colors.primary} />
+                  <Feather name="plus" size={18} color={Colors.primary} />
                 </View>
-                <Text style={styles.courseAddText}>Tambah{"\n"}Kursus</Text>
+                <Text style={styles.courseAddText}>Tambah Kursus Baru</Text>
+                <Feather name="chevron-right" size={14} color={Colors.textMuted} />
               </TouchableOpacity>
-            </ScrollView>
+            </View>
           ) : (
             <TouchableOpacity
               onPress={() => router.push("/(tabs)/learn")}
@@ -530,22 +569,43 @@ const styles = StyleSheet.create({
   alertPillText: { fontSize: 12, fontWeight: "800", color: "#fff" },
 
   /* Course cards */
-  courseScroll: { gap: 10, paddingRight: 4 },
+  courseList: { gap: 10 },
   courseCard: {
-    width: 148, borderRadius: 16, backgroundColor: Colors.white,
-    padding: 14, gap: 8,
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: Colors.white,
+    borderRadius: 18, overflow: "hidden",
+    minHeight: 76,
   },
-  courseIconBg: {
-    width: 44, height: 44, borderRadius: 12,
+  courseCardGrad: {
+    width: 72, alignSelf: "stretch",
     alignItems: "center", justifyContent: "center",
   },
-  courseName: { fontSize: 13, fontWeight: "800", color: Colors.dark, lineHeight: 19 },
-  courseSub: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
-  courseArrow: { flexDirection: "row", justifyContent: "flex-end" },
+  courseCardBody: {
+    flex: 1, paddingVertical: 13, paddingHorizontal: 12, gap: 4,
+  },
+  courseName: { fontSize: 15, fontWeight: "800", color: Colors.dark, lineHeight: 20 },
+  courseSub: { fontSize: 12, color: Colors.textMuted, fontWeight: "500" },
+  courseStatRow: { flexDirection: "row", gap: 8, marginTop: 2 },
+  courseStatChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: Colors.background, borderRadius: 20,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  courseStatText: { fontSize: 10, fontWeight: "700" },
+  courseCardArrow: { paddingRight: 14 },
+  courseArrowCircle: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: "center", justifyContent: "center",
+  },
+  courseShowMore: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 4, paddingVertical: 10,
+  },
+  courseShowMoreText: { fontSize: 13, fontWeight: "700", color: Colors.primary },
   courseCardAdd: {
-    width: 108, borderRadius: 16, backgroundColor: Colors.white,
-    padding: 14, alignItems: "center", justifyContent: "center",
-    gap: 8, borderWidth: 1.5, borderColor: Colors.border,
+    flexDirection: "row", alignItems: "center", gap: 12,
+    borderRadius: 18, backgroundColor: Colors.white,
+    padding: 16, borderWidth: 1.5, borderColor: Colors.border,
     borderStyle: "dashed",
   },
   courseAddIcon: {
@@ -553,7 +613,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryLight,
     alignItems: "center", justifyContent: "center",
   },
-  courseAddText: { fontSize: 12, fontWeight: "800", color: Colors.primary, textAlign: "center" },
+  courseAddText: { fontSize: 14, fontWeight: "700", color: Colors.primary, flex: 1 },
 
   /* Empty state */
   emptyCard: { borderRadius: 20, overflow: "hidden" },
