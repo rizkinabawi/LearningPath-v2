@@ -1,29 +1,46 @@
+import React from "react";
 import {
-  KeyboardAwareScrollView,
-  KeyboardAwareScrollViewProps,
-} from "react-native-keyboard-controller";
-import { Platform, ScrollView, ScrollViewProps } from "react-native";
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ScrollViewProps,
+  StyleSheet,
+  ViewStyle,
+} from "react-native";
 
-type Props = KeyboardAwareScrollViewProps & ScrollViewProps;
+type Props = ScrollViewProps & {
+  keyboardShouldPersistTaps?: "always" | "never" | "handled";
+  contentContainerStyle?: ViewStyle | ViewStyle[];
+  style?: ViewStyle | ViewStyle[];
+};
 
 export function KeyboardAwareScrollViewCompat({
   children,
   keyboardShouldPersistTaps = "handled",
+  contentContainerStyle,
+  style,
   ...props
 }: Props) {
-  if (Platform.OS === "web") {
-    return (
-      <ScrollView keyboardShouldPersistTaps={keyboardShouldPersistTaps} {...props}>
+  return (
+    <KeyboardAvoidingView
+      style={[styles.flex, style]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
+      <ScrollView
+        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+        contentContainerStyle={contentContainerStyle}
+        showsVerticalScrollIndicator={false}
+        {...props}
+      >
         {children}
       </ScrollView>
-    );
-  }
-  return (
-    <KeyboardAwareScrollView
-      keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-      {...props}
-    >
-      {children}
-    </KeyboardAwareScrollView>
+    </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+});
