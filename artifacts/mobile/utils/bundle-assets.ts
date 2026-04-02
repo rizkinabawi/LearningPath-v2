@@ -55,8 +55,10 @@ export const embedAssetsInPack = async (pack: CoursePack): Promise<CoursePack> =
   const toRead: string[] = [];
 
   for (const mat of pack.materials ?? []) {
-    if (mat.type === "image" && mat.imageLocalPath && isLocalUri(mat.imageLocalPath)) {
-      toRead.push(mat.imageLocalPath);
+    if (mat.type === "image") {
+      // imageLocalPath is the legacy field; filePath is used by the study-material screen
+      const imgUri = mat.imageLocalPath || mat.filePath;
+      if (imgUri && isLocalUri(imgUri)) toRead.push(imgUri);
     }
     if (mat.type === "file" && mat.filePath && isLocalUri(mat.filePath)) {
       toRead.push(mat.filePath);
@@ -112,6 +114,7 @@ export const extractAssetsFromPack = async (pack: CoursePack): Promise<CoursePac
     if (mat.imageLocalPath && uriMap[mat.imageLocalPath]) {
       updated.imageLocalPath = uriMap[mat.imageLocalPath];
     }
+    // filePath covers both file attachments and images saved by the study-material screen
     if (mat.filePath && uriMap[mat.filePath]) {
       updated.filePath = uriMap[mat.filePath];
     }
