@@ -13,6 +13,7 @@ import {
 } from "@/utils/storage";
 import Colors, { shadowSm } from "@/constants/colors";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { QuickAddQuizModal } from "@/components/QuickAddQuizModal";
 
 interface LessonRow {
   path: LearningPath;
@@ -38,6 +39,7 @@ export default function QuizBrowseAll() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -92,6 +94,21 @@ export default function QuizBrowseAll() {
 
   return (
     <View style={styles.root}>
+      <QuickAddQuizModal
+        visible={showAdd}
+        onClose={() => setShowAdd(false)}
+        onSaved={loadAll}
+      />
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 24 }]}
+        onPress={() => setShowAdd(true)}
+        activeOpacity={0.85}
+      >
+        <Feather name="plus" size={24} color="#fff" />
+      </TouchableOpacity>
+
       <LinearGradient
         colors={["#FF6B6B", "#FF9500"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -270,4 +287,10 @@ const styles = StyleSheet.create({
   countChipText: { fontSize: 11, fontWeight: "800" },
   startBtn: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   emptyChip: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
+  fab: {
+    position: "absolute", right: 20, width: 56, height: 56, borderRadius: 18,
+    backgroundColor: "#FF6B6B", alignItems: "center", justifyContent: "center",
+    zIndex: 50, shadowColor: "#FF6B6B", shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 12, elevation: 10,
+  },
 });

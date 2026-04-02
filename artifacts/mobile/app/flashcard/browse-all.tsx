@@ -13,6 +13,7 @@ import {
 } from "@/utils/storage";
 import Colors, { shadowSm } from "@/constants/colors";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { QuickAddFlashcardModal } from "@/components/QuickAddFlashcardModal";
 
 interface LessonRow {
   path: LearningPath;
@@ -38,6 +39,7 @@ export default function FlashcardBrowseAll() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -94,6 +96,21 @@ export default function FlashcardBrowseAll() {
 
   return (
     <View style={styles.root}>
+      <QuickAddFlashcardModal
+        visible={showAdd}
+        onClose={() => setShowAdd(false)}
+        onSaved={loadAll}
+      />
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 24 }]}
+        onPress={() => setShowAdd(true)}
+        activeOpacity={0.85}
+      >
+        <Feather name="plus" size={24} color="#fff" />
+      </TouchableOpacity>
+
       {/* Header */}
       <LinearGradient
         colors={["#4C6FFF", "#7C47FF"]}
@@ -276,4 +293,10 @@ const styles = StyleSheet.create({
   countChipText: { fontSize: 11, fontWeight: "800" },
   startBtn: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   emptyChip: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
+  fab: {
+    position: "absolute", right: 20, width: 56, height: 56, borderRadius: 18,
+    backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center",
+    zIndex: 50, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 12, elevation: 10,
+  },
 });
