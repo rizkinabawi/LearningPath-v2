@@ -1,133 +1,178 @@
 /**
  * bundle-assets.ts
- * Handles embedding local images/files as base64 in CoursePack,
- * and extracting them back to the filesystem on import.
+ * Handles embedding ALL local files as base64 in a CoursePack (version 2),
+ * and extracting them back to the device filesystem on import.
+ *
+ * Embedded asset map (assetData):
+ *   key   = original device URI of the file
+ *   value = base64-encoded file content
+ *
+ * On extraction, every key is re-written to imported_assets/ and all
+ * matching URI references inside the pack are updated to the new local paths.
  */
+
 import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
 import type { CoursePack, StudyMaterial, Flashcard, Quiz } from "./storage";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** True only for URIs that point to a real file on this device. */
 const isLocalUri = (uri?: string): boolean => {
   if (!uri) return false;
   return (
     uri.startsWith("file://") ||
-    uri.startsWith("/") ||
-    uri.startsWith(FileSystem.documentDirectory ?? "") ||
-    uri.startsWith(FileSystem.cacheDirectory ?? "")
+    uri.startsWith("/var/")  ||  // iOS absolute path (sometimes no scheme)
+    uri.startsWith("/data/") ||  // Android absolute path
+    uri.startsWith(FileSystem.documentDirectory ?? "__NONE__") ||
+    uri.startsWith(FileSystem.cacheDirectory    ?? "__NONE__")
   );
 };
 
+/** Read a local file as base64.  Returns null if missing or unreadable. */
 const readBase64Safe = async (uri: string): Promise<string | null> => {
   if (Platform.OS === "web") return null;
   try {
     const info = await FileSystem.getInfoAsync(uri);
     if (!info.exists) return null;
-    return await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+    const b64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    // Discard obviously empty reads
+    return b64 && b64.length > 0 ? b64 : null;
   } catch {
     return null;
   }
 };
 
-const writeBase64File = async (base64: string, filename: string): Promise<string> => {
-  const dir = FileSystem.documentDirectory + "imported_assets/";
+/**
+ * Write a base64 string to imported_assets/.
+ * Uses a unique filename to prevent collisions across multiple bundles.
+ */
+const writeBase64Asset = async (
+  base64: string,
+  originalUri: string,
+  index: number
+): Promise<string> => {
+  const base = FileSystem.documentDirectory ?? "";
+  const dir  = base + "imported_assets/";
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+
+  // Build a unique filename: index_originalBasename
+  const parts    = originalUri.replace(/\?.*$/, "").split("/");
+  const basename = parts[parts.length - 1] || `asset_${index}`;
+  const filename = `${index}_${basename}`;
+
   const dest = dir + filename;
-  await FileSystem.writeAsStringAsync(dest, base64, { encoding: FileSystem.EncodingType.Base64 });
+  await FileSystem.writeAsStringAsync(dest, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  // Verify the file was actually written
+  const info = await FileSystem.getInfoAsync(dest);
+  if (!info.exists) throw new Error(`Write failed: ${dest}`);
+
   return dest;
 };
 
-const safeFilename = (uri: string, fallback: string): string => {
-  const parts = uri.split("/");
-  const name = parts[parts.length - 1];
-  return name && name.length > 0 ? name : fallback;
-};
+// ─── Collect all local URIs that need embedding ──────────────────────────────
 
-// ─── Embed: local files → base64 inside pack ────────────────────────────────
+function collectLocalUris(pack: CoursePack): string[] {
+  const uris: string[] = [];
+
+  for (const mat of pack.materials ?? []) {
+    // Images: the study-material screen stores in filePath;
+    //         older/import-roadmap code may use imageLocalPath.
+    if (mat.type === "image") {
+      const uri = mat.imageLocalPath || mat.filePath;
+      if (uri && isLocalUri(uri)) uris.push(uri);
+    }
+    // File attachments
+    if (mat.type === "file" && mat.filePath && isLocalUri(mat.filePath)) {
+      uris.push(mat.filePath);
+    }
+  }
+
+  for (const fc of pack.flashcards ?? []) {
+    if (fc.image && isLocalUri(fc.image)) uris.push(fc.image);
+  }
+
+  for (const qz of pack.quizzes ?? []) {
+    if (qz.image && isLocalUri(qz.image)) uris.push(qz.image);
+  }
+
+  return [...new Set(uris)]; // deduplicate
+}
+
+// ─── Embed: local files → base64 inside pack ─────────────────────────────────
 
 export const embedAssetsInPack = async (pack: CoursePack): Promise<CoursePack> => {
   if (Platform.OS === "web") return { ...pack, version: 2 };
 
   const assetData: Record<string, string> = { ...(pack.assetData ?? {}) };
+  const uris = collectLocalUris(pack);
 
-  // Collect all local URIs to encode
-  const toRead: string[] = [];
-
-  for (const mat of pack.materials ?? []) {
-    if (mat.type === "image") {
-      // imageLocalPath is the legacy field; filePath is used by the study-material screen
-      const imgUri = mat.imageLocalPath || mat.filePath;
-      if (imgUri && isLocalUri(imgUri)) toRead.push(imgUri);
-    }
-    if (mat.type === "file" && mat.filePath && isLocalUri(mat.filePath)) {
-      toRead.push(mat.filePath);
-    }
-  }
-  for (const fc of pack.flashcards ?? []) {
-    if (fc.image && isLocalUri(fc.image)) toRead.push(fc.image);
-  }
-  for (const qz of pack.quizzes ?? []) {
-    if (qz.image && isLocalUri(qz.image)) toRead.push(qz.image);
-  }
-
-  // Read all unique URIs concurrently
-  const unique = [...new Set(toRead)];
   await Promise.all(
-    unique.map(async (uri) => {
-      if (assetData[uri]) return; // already embedded
+    uris.map(async (uri) => {
+      if (assetData[uri]) return; // already embedded from a previous pass
       const b64 = await readBase64Safe(uri);
       if (b64) assetData[uri] = b64;
+      // If b64 is null the file is missing; silently skip (don't embed broken refs)
     })
   );
 
   return { ...pack, version: 2, assetData };
 };
 
-// ─── Extract: base64 inside pack → local files ──────────────────────────────
+// ─── Extract: base64 inside pack → local files ───────────────────────────────
 
 export const extractAssetsFromPack = async (pack: CoursePack): Promise<CoursePack> => {
-  if (Platform.OS === "web" || !pack.assetData || Object.keys(pack.assetData).length === 0) {
+  if (
+    Platform.OS === "web" ||
+    !pack.assetData ||
+    Object.keys(pack.assetData).length === 0
+  ) {
     return pack;
   }
 
-  // Write all base64 assets to local storage and build URI remapping
+  // Write every embedded asset to the device and build oldUri → newUri map.
+  // Use sequential index (not counter++) to avoid race conditions in Promise.all.
+  const entries = Object.entries(pack.assetData);
   const uriMap: Record<string, string> = {};
-  let counter = 0;
 
   await Promise.all(
-    Object.entries(pack.assetData).map(async ([originalUri, base64]) => {
+    entries.map(async ([originalUri, base64], index) => {
+      if (!base64 || base64.length === 0) return; // skip empty/corrupt entries
       try {
-        counter++;
-        const filename = safeFilename(originalUri, `asset_${counter}`);
-        const newUri = await writeBase64File(base64, filename);
+        const newUri = await writeBase64Asset(base64, originalUri, index);
         uriMap[originalUri] = newUri;
       } catch {
-        // skip broken asset
+        // Asset could not be written — leave URI unmapped; viewer will handle missing file
       }
     })
   );
 
-  // Remap URIs in materials
+  // Remap all URI references in study materials
   const remappedMaterials: StudyMaterial[] = (pack.materials ?? []).map((mat) => {
     const updated = { ...mat };
+    // imageLocalPath (legacy field)
     if (mat.imageLocalPath && uriMap[mat.imageLocalPath]) {
       updated.imageLocalPath = uriMap[mat.imageLocalPath];
     }
-    // filePath covers both file attachments and images saved by the study-material screen
+    // filePath (used for both images and file attachments)
     if (mat.filePath && uriMap[mat.filePath]) {
       updated.filePath = uriMap[mat.filePath];
     }
     return updated;
   });
 
-  // Remap URIs in flashcards
+  // Remap flashcard images
   const remappedFlashcards: Flashcard[] = (pack.flashcards ?? []).map((fc) => {
     if (fc.image && uriMap[fc.image]) return { ...fc, image: uriMap[fc.image] };
     return fc;
   });
 
-  // Remap URIs in quizzes
+  // Remap quiz images
   const remappedQuizzes: Quiz[] = (pack.quizzes ?? []).map((qz) => {
     if (qz.image && uriMap[qz.image]) return { ...qz, image: uriMap[qz.image] };
     return qz;
@@ -135,24 +180,28 @@ export const extractAssetsFromPack = async (pack: CoursePack): Promise<CoursePac
 
   return {
     ...pack,
-    materials: remappedMaterials,
+    materials:  remappedMaterials,
     flashcards: remappedFlashcards,
-    quizzes: remappedQuizzes,
-    assetData: undefined, // clear embedded data after extraction
+    quizzes:    remappedQuizzes,
+    assetData:  undefined, // free memory — all assets are now on disk
   };
 };
 
-// ─── Count embedded assets for UI display ────────────────────────────────────
+// ─── Count assets for UI summary display ─────────────────────────────────────
 
-export const countEmbeddedAssets = (pack: CoursePack): { images: number; files: number; links: number } => {
+export const countEmbeddedAssets = (
+  pack: CoursePack
+): { images: number; files: number; links: number } => {
   let images = 0, files = 0, links = 0;
+
   for (const mat of pack.materials ?? []) {
-    if (mat.type === "image") images++;
+    if (mat.type === "image")  images++;
     else if (mat.type === "file") files++;
     else if (mat.type === "youtube" || mat.type === "googledoc") links++;
   }
-  // Count flashcard/quiz images
+
   for (const fc of pack.flashcards ?? []) { if (fc.image) images++; }
   for (const qz of pack.quizzes ?? []) { if (qz.image) images++; }
+
   return { images, files, links };
 };
