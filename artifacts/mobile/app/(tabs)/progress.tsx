@@ -26,6 +26,7 @@ import { generateReportHTML } from "@/utils/report-generator";
 import { ProgressBar } from "@/components/ProgressBar";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
+import { isCancellationError } from "@/utils/safe-share";
 
 type Tab = "stats" | "classify" | "prompts";
 
@@ -125,8 +126,8 @@ export default function ProgressTab() {
       } else {
         toast.info("PDF tersimpan di perangkat");
       }
-    } catch {
-      toast.error("Gagal membuat PDF");
+    } catch (e) {
+      if (!isCancellationError(e)) toast.error("Gagal membuat PDF");
     } finally {
       setPdfLoading(false);
     }
@@ -148,8 +149,8 @@ export default function ProgressTab() {
       } else {
         toast.info("Sharing tidak tersedia di perangkat ini");
       }
-    } catch {
-      toast.error("Gagal membuat gambar");
+    } catch (e) {
+      if (!isCancellationError(e)) toast.error("Gagal membuat gambar");
     } finally {
       setShareLoading(false);
     }

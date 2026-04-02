@@ -12,6 +12,7 @@ import {
 } from "@/utils/storage";
 import { embedAssetsInPack, countEmbeddedAssets } from "@/utils/bundle-assets";
 import Colors, { shadowSm } from "@/constants/colors";
+import { isCancellationError } from "@/utils/safe-share";
 
 interface PathStat {
   path: LearningPath;
@@ -113,8 +114,8 @@ export function CourseBundleShareModal({ visible, onClose }: Props) {
             `Import file ini ke Mobile Learning App untuk langsung belajar! 🎓`,
         });
       }
-    } catch {
-      // silently fail
+    } catch (e) {
+      if (!isCancellationError(e)) console.warn("[CourseBundleModal] share error", e);
     } finally {
       setSharing(null);
       setSharingStep("");

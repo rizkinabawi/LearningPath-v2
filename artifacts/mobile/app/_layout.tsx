@@ -9,13 +9,30 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, LogBox, Platform, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ToastContainer } from "@/components/Toast";
 import { scheduleDailyMotivation, getReminderSettings, scheduleStudyReminder } from "@/utils/notifications";
+import { isCancellationError } from "@/utils/safe-share";
+
+// Suppress share-cancellation noise in dev overlay
+LogBox.ignoreLogs([
+  "Abort due to cancellation of share",
+  "User cancelled",
+  "share was cancelled",
+]);
+
+// Global safety net for unhandled promise rejections from share cancellation
+if (Platform.OS !== "web" && typeof (global as any).ErrorUtils !== "undefined") {
+  const originalHandler = (global as any).ErrorUtils.getGlobalHandler();
+  (global as any).ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+    if (isCancellationError(error)) return;
+    if (originalHandler) originalHandler(error, isFatal);
+  });
+}
 
 SplashScreen.preventAutoHideAsync();
 

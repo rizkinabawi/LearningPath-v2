@@ -18,6 +18,7 @@ import { shareJson, copyJsonToClipboard, type LearningJsonOutput } from "@/utils
 import { exportAsZip } from "@/utils/zip-handler";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
 import { toast } from "@/components/Toast";
+import { isCancellationError } from "@/utils/safe-share";
 
 const { width } = Dimensions.get("window");
 
@@ -190,8 +191,8 @@ export const PromptBuilder = () => {
     try {
       const { Share } = await import("react-native");
       await Share.share({ message: generatedPrompt });
-    } catch {
-      toast.error("Gagal membagikan prompt");
+    } catch (e) {
+      if (!isCancellationError(e)) toast.error("Gagal membagikan prompt");
     }
   };
 

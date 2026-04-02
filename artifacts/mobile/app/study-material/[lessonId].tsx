@@ -47,6 +47,7 @@ import {
 } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
+import { isCancellationError } from "@/utils/safe-share";
 
 const MATERIAL_DIR =
   ((FileSystem as any).documentDirectory ?? "") + "study-materials/";
@@ -307,8 +308,8 @@ export default function StudyMaterialScreen() {
       } else {
         await Linking.openURL(mat.filePath);
       }
-    } catch {
-      toast.error("Tidak bisa membuka file");
+    } catch (e) {
+      if (!isCancellationError(e)) toast.error("Tidak bisa membuka file");
     }
   };
 
@@ -332,8 +333,8 @@ export default function StudyMaterialScreen() {
             UTI: "public.html",
           });
         }
-      } catch {
-        toast.error("Tidak bisa preview HTML di perangkat ini");
+      } catch (e) {
+        if (!isCancellationError(e)) toast.error("Tidak bisa preview HTML di perangkat ini");
       }
     }
   };

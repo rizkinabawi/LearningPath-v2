@@ -2,6 +2,7 @@ import { Share, Platform } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
+import { isCancellationError } from "./safe-share";
 
 // ─── Canonical AI output types (these match the format AI is asked to produce) ─
 
@@ -83,8 +84,10 @@ export async function shareJson(data: LearningJsonOutput): Promise<void> {
     } else {
       await Share.share({ message: json, title: filename });
     }
-  } catch {
-    await Clipboard.setStringAsync(json);
+  } catch (e) {
+    if (!isCancellationError(e)) {
+      await Clipboard.setStringAsync(json);
+    }
   }
 }
 

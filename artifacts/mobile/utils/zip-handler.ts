@@ -3,6 +3,7 @@ import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-image-picker";
 import { Platform } from "react-native";
 import type { LearningJsonOutput } from "./json-export";
+import { isCancellationError } from "./safe-share";
 
 async function loadJsZip() {
   const JSZip = (await import("jszip")).default;
@@ -43,10 +44,14 @@ export async function exportAsZip(
 
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
-    await Sharing.shareAsync(path, {
-      mimeType: "application/zip",
-      dialogTitle: `Export ZIP — ${data.topic}`,
-    });
+    try {
+      await Sharing.shareAsync(path, {
+        mimeType: "application/zip",
+        dialogTitle: `Export ZIP — ${data.topic}`,
+      });
+    } catch (e) {
+      if (!isCancellationError(e)) throw e;
+    }
   }
 }
 

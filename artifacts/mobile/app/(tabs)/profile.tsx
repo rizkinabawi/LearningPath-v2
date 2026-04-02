@@ -21,6 +21,7 @@ import {
 import { CourseBundleShareModal, CourseImportPreviewModal } from "@/components/CourseBundleModal";
 import { extractAssetsFromPack } from "@/utils/bundle-assets";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
+import { isCancellationError } from "@/utils/safe-share";
 
 export default function ProfileTab() {
   const router = useRouter();
@@ -134,7 +135,13 @@ export default function ProfileTab() {
       icon: "share-2" as const, label: "Bagikan Progress",
       sub: "Ceritakan pencapaianmu",
       color: Colors.amber,
-      onPress: async () => Share.share({ message: `Akurasi saya ${accuracy}% dengan ${stats?.totalAnswers ?? 0} jawaban di Mobile Learning! 🎓` }),
+      onPress: async () => {
+        try {
+          await Share.share({ message: `Akurasi saya ${accuracy}% dengan ${stats?.totalAnswers ?? 0} jawaban di Mobile Learning! 🎓` });
+        } catch (e) {
+          if (!isCancellationError(e)) console.warn("[profile] share error", e);
+        }
+      },
     },
     {
       icon: "refresh-cw" as const, label: "Reset Profil",
