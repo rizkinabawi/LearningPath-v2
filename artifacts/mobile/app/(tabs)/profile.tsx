@@ -8,7 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import {
   getUser, getStats, getLearningPaths, clearAllData,
   importCourse,
@@ -31,7 +31,7 @@ export default function ProfileTab() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
   const { t, language, setLanguage } = useTranslation();
-  const { isDark, toggleDark } = useTheme();
+  const { isDark, toggleTheme: toggleDark } = useTheme();
   const [user, setUser] = useState<UserType | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [pathCount, setPathCount] = useState(0);
@@ -429,7 +429,7 @@ export default function ProfileTab() {
                     <TouchableOpacity
                       key={m}
                       style={[styles.minuteChip, reminder.minute === m && styles.minuteChipActive]}
-                      onPress={() => cycleMinute([0, 15, 30, 45].indexOf(m) - [0, 15, 30, 45].indexOf(reminder.minute))}
+                      onPress={() => cycleMinute(([0, 15, 30, 45].indexOf(m) - [0, 15, 30, 45].indexOf(reminder.minute)) as 1 | -1)}
                     >
                       <Text style={[styles.minuteChipText, reminder.minute === m && styles.minuteChipTextActive]}>
                         :{String(m).padStart(2, "0")}

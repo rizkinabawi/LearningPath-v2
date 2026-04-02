@@ -19,7 +19,7 @@ import {
 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import {
   saveLearningPath, saveModule, saveLesson,
   saveFlashcardPack, saveQuizPack, saveStudyMaterial,
@@ -460,7 +460,7 @@ export default function ImportRoadmapScreen() {
       }
 
       toast.success(
-        `Berhasil! "${data.course_name}" dibuat dengan ${preview.totalModules} modul & ${preview.totalLessons} pelajaran.`
+        `Berhasil! "${data.course_name}" dibuat dengan ${preview!.totalModules} modul & ${preview!.totalLessons} pelajaran.`
       );
       router.back();
     } catch (e: any) {
@@ -491,7 +491,6 @@ export default function ImportRoadmapScreen() {
         styles.content,
         { paddingTop: Platform.OS === "web" ? 80 : insets.top + 16, paddingBottom: 60 },
       ]}
-      bottomOffset={16}
       keyboardShouldPersistTaps="handled"
     >
       {/* Header */}

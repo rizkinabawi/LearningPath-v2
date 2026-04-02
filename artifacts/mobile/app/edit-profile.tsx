@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import { getUser, saveUser, type User } from "@/utils/storage";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";

@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-image-picker";
 import { Platform } from "react-native";

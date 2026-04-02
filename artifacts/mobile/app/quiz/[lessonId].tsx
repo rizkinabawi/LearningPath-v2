@@ -187,7 +187,7 @@ export default function QuizScreen() {
         <Text style={styles.resultEmoji}>{pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪"}</Text>
         <Text style={styles.resultTitle}>{t.quiz.result_title}</Text>
         <Text style={styles.resultScore}>{pct}%</Text>
-        <Text style={styles.resultSub}>{t.quiz.result_correct(score, quizzes.length)}</Text>
+        <Text style={styles.resultSub}>{t.quiz.result_score(score, quizzes.length)}</Text>
         <View style={{ width: "100%", marginVertical: 8 }}>
           <ProgressBar
             value={pct}
@@ -263,7 +263,7 @@ export default function QuizScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.questionCard}>
-          <Text style={styles.questionLabel}>{t.quiz.question_n(currentIndex + 1)}</Text>
+          <Text style={styles.questionLabel}>{t.quiz.question_label(currentIndex + 1)}</Text>
           {/* Image above question */}
           {currentQuiz.image && (
             <Image

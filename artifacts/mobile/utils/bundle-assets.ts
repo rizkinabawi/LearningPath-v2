@@ -11,7 +11,7 @@
  * matching URI references inside the pack are updated to the new local paths.
  */
 
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import { Platform } from "react-native";
 import type { CoursePack, StudyMaterial, Flashcard, Quiz } from "./storage";
 

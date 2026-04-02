@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
@@ -56,7 +56,7 @@ export default function ImageManager() {
   const [preview, setPreview] = useState<ImageItem | null>(null);
 
   const load = useCallback(async () => {
-    if (Platform.OS === "web") { setLoading(false); return; }
+    if ((Platform.OS as string) === "web") { setLoading(false); return; }
     setLoading(true);
 
     // Compute paths at runtime so FileSystem is fully initialized
@@ -148,7 +148,7 @@ export default function ImageManager() {
   const totalSize = images.reduce((s, i) => s + i.size, 0);
   const isSelecting = selected.size > 0;
 
-  if (Platform.OS === "web") {
+  if ((Platform.OS as string) === "web") {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
         <Text style={{ color: Colors.textMuted, fontSize: 14 }}>
@@ -162,7 +162,7 @@ export default function ImageManager() {
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <LinearGradient
         colors={["#0EA5E9", "#6366F1"]}
-        style={[styles.header, { paddingTop: Platform.OS === "web" ? 60 : insets.top + 16 }]}
+        style={[styles.header, { paddingTop: (Platform.OS as string) === "web" ? 60 : insets.top + 16 }]}
       >
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>

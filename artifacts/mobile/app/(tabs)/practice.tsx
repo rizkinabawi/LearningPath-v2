@@ -87,7 +87,7 @@ export default function PracticeTab() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          isTablet && { paddingHorizontal: pad, maxWidth: 1100, alignSelf: "center", width: "100%" },
+          isTablet && { paddingHorizontal: 32, maxWidth: 1100, alignSelf: "center", width: "100%" },
         ]}
         showsVerticalScrollIndicator={false}
       >

@@ -236,12 +236,12 @@ export default function DailyChallengeScreen() {
         ) : flashcard ? (
           <TouchableOpacity onPress={handleFlip} activeOpacity={0.9}>
             <View style={styles.cardWrap}>
-              <Animated.View style={[styles.cardFace, { backgroundColor: C.primary, transform: [{ rotateY: frontInterpolate }] }]}>
+              <Animated.View style={[styles.cardFace, { backgroundColor: C.primary, transform: [{ rotateY: frontInterpolate as unknown as string }] }]}>
                 <Text style={styles.cardLabel}>PERTANYAAN</Text>
                 <Text style={styles.cardQuestion}>{flashcard.question}</Text>
                 <Text style={styles.cardHint}>Tap untuk lihat jawaban</Text>
               </Animated.View>
-              <Animated.View style={[styles.cardFace, styles.cardBack, { backgroundColor: C.surface, transform: [{ rotateY: backInterpolate }] }]}>
+              <Animated.View style={[styles.cardFace, styles.cardBack, { backgroundColor: C.surface, transform: [{ rotateY: backInterpolate as unknown as string }] }]}>
                 <Text style={[styles.cardLabel, { color: C.textMuted }]}>JAWABAN</Text>
                 <Text style={[styles.cardAnswer, { color: C.text }]}>{flashcard.answer}</Text>
               </Animated.View>
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 20, alignItems: "center", position: "relative" },
   backBtn: {
     position: "absolute", left: 20,
-    top: Platform.OS === "web" ? 56 : 52,
+    top: (Platform.OS as string) === "web" ? 56 : 52,
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center", justifyContent: "center",
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   optionLabel: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   optionLabelTxt: { fontSize: 14, fontWeight: "800" },
   optionText: { flex: 1, fontSize: 14, fontWeight: "600", lineHeight: 20 },
-  cardWrap: { height: 220, perspective: 1000 },
+  cardWrap: { height: 220 },
   cardFace: {
     position: "absolute", width: "100%", height: "100%",
     borderRadius: 20, padding: 24,

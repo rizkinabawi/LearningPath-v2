@@ -18,7 +18,7 @@ import {
   Copy, Check, Download, PencilLine,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import { Button } from "@/components/Button";
@@ -492,7 +492,6 @@ export default function CreateFlashcardScreen() {
           paddingBottom: 60,
         },
       ]}
-      bottomOffset={16}
       keyboardShouldPersistTaps="handled"
     >
       {/* Header */}
@@ -1107,7 +1106,7 @@ const styles = StyleSheet.create({
   importBox: { gap: 8, marginBottom: 20 },
   importHint: { fontSize: 12, color: Colors.textMuted, fontWeight: "500", fontStyle: "italic" },
   importFormat: { fontSize: 11, color: Colors.textSecondary, fontWeight: "600", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
-  filePickBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.card, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, borderStyle: "dashed" },
+  filePickBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.card1, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, borderStyle: "dashed" },
   filePickText: { fontSize: 13, fontWeight: "600", color: Colors.primary, flex: 1 },
   importOr: { flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 2 },
   importOrLine: { flex: 1, height: 1, backgroundColor: Colors.border },

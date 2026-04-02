@@ -26,7 +26,7 @@ import {
   PencilLine,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "@/utils/fs-compat";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import { Button } from "@/components/Button";
@@ -559,7 +559,6 @@ export default function CreateQuizScreen() {
           paddingBottom: 60,
         },
       ]}
-      bottomOffset={16}
       keyboardShouldPersistTaps="handled"
     >
       {/* Header */}
