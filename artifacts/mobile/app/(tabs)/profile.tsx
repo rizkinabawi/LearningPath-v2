@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, Platform, Share,
-  ActivityIndicator, Switch,
+  ActivityIndicator, Switch, useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -25,6 +25,8 @@ import Colors, { shadow, shadowSm } from "@/constants/colors";
 export default function ProfileTab() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 720;
   const [user, setUser] = useState<UserType | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [pathCount, setPathCount] = useState(0);
@@ -158,7 +160,11 @@ export default function ProfileTab() {
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView style={styles.root} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={isTablet ? { maxWidth: 860, alignSelf: "center", width: "100%" } : undefined}
+      showsVerticalScrollIndicator={false}
+    >
       {/* ── HEADER ── */}
       <LinearGradient
         colors={["#4C6FFF", "#7C47FF"]}

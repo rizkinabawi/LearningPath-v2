@@ -6,7 +6,7 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
   Alert,
 } from "react-native";
@@ -22,7 +22,6 @@ import { ProgressBar } from "@/components/ProgressBar";
 import Colors from "@/constants/colors";
 import { toast } from "@/components/Toast";
 
-const { width } = Dimensions.get("window");
 type Tab = "stats" | "classify" | "prompts";
 
 const DIFF_CONFIG = {
@@ -33,6 +32,8 @@ const DIFF_CONFIG = {
 
 export default function ProgressTab() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 720;
   const params = useLocalSearchParams<{ tab?: string }>();
   const [stats, setStats] = useState<Stats | null>(null);
   const [progress, setProgress] = useState<Progress[]>([]);
@@ -187,7 +188,13 @@ export default function ProgressTab() {
 
       {/* ===== CONTENT ===== */}
       {tab === "stats" && (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            isTablet && { maxWidth: 1100, alignSelf: "center", width: "100%", paddingHorizontal: 32 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
 
           {/* Weekly bar chart */}
           <View style={styles.card}>
@@ -251,15 +258,18 @@ export default function ProgressTab() {
                 </View>
               </View>
               <View style={styles.heatmapWrap}>
-                {recent.slice(0, 21).map((p, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.heatCell,
-                      { backgroundColor: p.isCorrect ? "#0AD3C1" : "#FF6B6B" },
-                    ]}
-                  />
-                ))}
+                {recent.slice(0, 21).map((p, i) => {
+                  const cellSize = (Math.min(width, 1100) - 28 - 14 * 2 - 6 * 6) / 7;
+                  return (
+                    <View
+                      key={i}
+                      style={[
+                        styles.heatCell,
+                        { width: cellSize, height: cellSize, backgroundColor: p.isCorrect ? "#0AD3C1" : "#FF6B6B" },
+                      ]}
+                    />
+                  );
+                })}
               </View>
               <View style={styles.heatLegend}>
                 <View style={styles.legendItem}>
@@ -329,7 +339,13 @@ export default function ProgressTab() {
       )}
 
       {tab === "classify" && (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            isTablet && { maxWidth: 1100, alignSelf: "center", width: "100%", paddingHorizontal: 32 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Summary pills */}
           <View style={styles.card}>
             <View style={styles.cardHead}>
@@ -462,7 +478,7 @@ const styles = StyleSheet.create({
   barDayText: { fontSize: 9, color: Colors.textMuted, fontWeight: "700" },
   progressSub: { fontSize: 11, color: Colors.textMuted, fontWeight: "600" },
   heatmapWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  heatCell: { width: (width - 28 - 14 * 2 - 6 * 6) / 7, height: (width - 28 - 14 * 2 - 6 * 6) / 7, borderRadius: 5 },
+  heatCell: { borderRadius: 5 },
   heatLegend: { flexDirection: "row", alignItems: "center", gap: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   legendDot: { width: 10, height: 10, borderRadius: 3 },

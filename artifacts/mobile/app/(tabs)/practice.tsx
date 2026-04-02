@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Dimensions,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -11,8 +11,6 @@ import {
   type LearningPath,
 } from "@/utils/storage";
 import Colors, { shadow, shadowSm, CARD_GRADIENTS } from "@/constants/colors";
-
-const { width } = Dimensions.get("window");
 
 const MODES = [
   {
@@ -45,6 +43,12 @@ const MODES = [
 export default function PracticeTab() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 720;
+  const pad = isTablet ? 32 : 16;
+  const modeCardWidth = isTablet
+    ? (width - pad * 2 - 10) / 4   // 4 kolom di tablet
+    : (width - pad * 2 - 10) / 2;  // 2 kolom di hp
   const [paths, setPaths] = useState<LearningPath[]>([]);
   const [cardCount, setCardCount] = useState(0);
   const [quizCount, setQuizCount] = useState(0);
@@ -99,7 +103,13 @@ export default function PracticeTab() {
         </View>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          isTablet && { paddingHorizontal: pad, maxWidth: 1100, alignSelf: "center", width: "100%" },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Mode grid */}
         <Text style={styles.sectionTitle}>Pilih Mode</Text>
         <View style={styles.modeGrid}>
@@ -108,7 +118,7 @@ export default function PracticeTab() {
               key={i}
               onPress={() => m.route ? router.push(m.route as any) : router.push("/(tabs)/learn")}
               activeOpacity={0.88}
-              style={[styles.modeCard, shadow]}
+              style={[styles.modeCard, shadow, { width: modeCardWidth }]}
             >
               <LinearGradient
                 colors={m.gradient}
@@ -196,7 +206,7 @@ const styles = StyleSheet.create({
   scroll: { padding: 20, paddingBottom: 40, gap: 12 },
   sectionTitle: { fontSize: 15, fontWeight: "800", color: Colors.dark, letterSpacing: -0.2, marginBottom: 12 },
   modeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  modeCard: { width: (width - 40 - 10) / 2, borderRadius: 16, overflow: "hidden" },
+  modeCard: { borderRadius: 16, overflow: "hidden" },
   modeGrad: { padding: 18, minHeight: 148, overflow: "hidden", justifyContent: "flex-end" },
   modeBlob: { position: "absolute", width: 90, height: 90, borderRadius: 45, backgroundColor: "rgba(255,255,255,0.1)", top: -20, right: -20 },
   modeIconWrap: { width: 42, height: 42, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", marginBottom: 10 },
