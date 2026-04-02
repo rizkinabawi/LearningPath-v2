@@ -94,9 +94,9 @@ function YoutubeEmbed({ url }: { url: string }) {
     );
   }
 
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1`;
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&enablejsapi=1`;
 
-  if (Platform.OS === "web") {
+  if ((Platform.OS as string) === "web") {
     return (
       <View style={ytStyles.container}>
         {/* @ts-ignore - iframe is valid on web */}
@@ -113,17 +113,46 @@ function YoutubeEmbed({ url }: { url: string }) {
     );
   }
 
+  // Use inline HTML to avoid YouTube Error 153 in Android WebView.
+  // Loading embed URL directly causes Error 153; injecting via html source bypasses it.
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; background: #000; }
+  body { background: #000; overflow: hidden; }
+  .wrap { position: relative; width: 100%; padding-top: 56.25%; }
+  iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <iframe
+    src="${embedUrl}"
+    frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+    allowfullscreen
+    webkitallowfullscreen
+    mozallowfullscreen>
+  </iframe>
+</div>
+</body>
+</html>`;
+
   return (
     <View style={ytStyles.container}>
       <WebView
-        source={{ uri: embedUrl }}
-        style={{ width: PLAYER_WIDTH, height: PLAYER_HEIGHT, borderRadius: 12 }}
+        source={{ html, baseUrl: "https://www.youtube.com" }}
+        style={{ width: PLAYER_WIDTH, height: PLAYER_HEIGHT, borderRadius: 12, backgroundColor: "#000" }}
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         javaScriptEnabled
         domStorageEnabled
         startInLoadingState
         scrollEnabled={false}
+        allowsFullscreenVideo
+        originWhitelist={["*"]}
       />
       <TouchableOpacity
         style={ytStyles.openBtn}
