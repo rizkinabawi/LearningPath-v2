@@ -61,12 +61,27 @@ const FC_LANG_LABELS: Record<string, string> = {
   "Korean": "Korean (한국어)",
 };
 
+/** Normalize iOS smart quotes and invisible characters to plain ASCII */
+const normalizeJsonText = (raw: string): string =>
+  raw
+    // Smart/curly double quotes → straight double quotes
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    // Smart/curly single quotes → straight single quotes
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+    // Non-breaking spaces, zero-width chars, BOM → regular space / nothing
+    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, " ")
+    // Unicode line/paragraph separators → newline
+    .replace(/[\u2028\u2029]/g, "\n")
+    // Windows CRLF → LF
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+
 /** Robustly extract a JSON array or object from any AI response text */
 const extractJsonFromText = (text: string): string => {
-  const t = text.trim();
+  const t = normalizeJsonText(text).trim();
   // 1. Strip markdown code fences (with optional text before them)
   const fenceMatch = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenceMatch) return fenceMatch[1].trim();
+  if (fenceMatch) return normalizeJsonText(fenceMatch[1]).trim();
   // 2. Find first '[' or '{' and last ']' or '}'
   const arrStart = t.indexOf("[");
   const arrEnd = t.lastIndexOf("]");
