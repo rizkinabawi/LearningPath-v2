@@ -24,12 +24,19 @@ import { useTranslation } from "@/contexts/LanguageContext";
 
 const { width } = Dimensions.get("window");
 
-const TIPS = [
-  "Belajar 20 menit sehari lebih efektif dari 2 jam seminggu sekali.",
-  "Ulangi materi yang salah sebelum melanjutkan ke topik baru.",
-  "Flashcard aktif meningkatkan retensi hingga 3x lipat.",
-  "Istirahat setiap 45 menit menjaga fokus tetap optimal.",
-  "Gabungkan quiz dan flashcard untuk pemahaman yang lebih mendalam.",
+const QUOTES = [
+  { text: "Belajar 20 menit sehari lebih efektif dari 2 jam seminggu sekali.", author: "Learning Science" },
+  { text: "Kesuksesan adalah hasil dari persiapan, kerja keras, dan belajar dari kegagalan.", author: "Colin Powell" },
+  { text: "Pendidikan adalah senjata paling ampuh yang bisa kamu gunakan untuk mengubah dunia.", author: "Nelson Mandela" },
+  { text: "Investasi terbaik adalah investasi pada dirimu sendiri.", author: "Benjamin Franklin" },
+  { text: "Setiap hari adalah kesempatan baru untuk menjadi lebih baik dari kemarin.", author: "Unknown" },
+  { text: "Fokus pada prosesnya, bukan hanya hasilnya — kebiasaan baik membentuk kesuksesan.", author: "James Clear" },
+  { text: "Kamu tidak harus luar biasa untuk memulai, tapi kamu harus memulai untuk menjadi luar biasa.", author: "Zig Ziglar" },
+  { text: "Flashcard aktif meningkatkan retensi memori hingga 3x lipat dibanding membaca pasif.", author: "Learning Science" },
+  { text: "Spaced repetition: belajar sedikit setiap hari jauh lebih kuat dari belajar banyak sekaligus.", author: "Hermann Ebbinghaus" },
+  { text: "Otak yang berpikir aktif tumbuh lebih kuat — tanya, eksplorasi, coba.", author: "Neuroscience" },
+  { text: "Kesalahan bukan tanda kegagalan — itu adalah bukti bahwa kamu mencoba sesuatu yang baru.", author: "Unknown" },
+  { text: "Disiplin adalah jembatan antara tujuan dan pencapaian.", author: "Jim Rohn" },
 ];
 
 const COURSE_ICONS: React.ComponentProps<typeof Feather>["name"][] = [
@@ -66,7 +73,7 @@ export default function Dashboard() {
   const greet = hour < 12 ? t.home.greeting_morning : hour < 17 ? t.home.greeting_afternoon : t.home.greeting_evening;
   const firstName = user?.name?.split(" ")[0] ?? "Learner";
   const dateStr = t.home.date_format(t.home.days[now.getDay()], now.getDate(), t.home.months[now.getMonth()]);
-  const tip = TIPS[now.getDate() % TIPS.length];
+  const todayQuote = QUOTES[(now.getDate() + now.getMonth() * 3) % QUOTES.length];
 
   return (
     <View style={styles.root}>
@@ -127,10 +134,13 @@ export default function Dashboard() {
             ))}
           </View>
 
-          {/* Tip strip */}
+          {/* Quote strip */}
           <View style={styles.tipStrip}>
             <Feather name="zap" size={12} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.tipText} numberOfLines={2}>{tip}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tipText} numberOfLines={2}>"{todayQuote.text}"</Text>
+              <Text style={[styles.tipText, { fontSize: 10, opacity: 0.6, marginTop: 2 }]}>— {todayQuote.author}</Text>
+            </View>
           </View>
         </LinearGradient>
 
@@ -301,6 +311,30 @@ export default function Dashboard() {
                 color: Colors.teal,
                 bg: Colors.tealLight,
                 route: "/(tabs)/progress",
+              },
+              {
+                icon: "star" as const,
+                label: "Tantangan Harian",
+                sub: "Soal baru tiap hari",
+                color: "#F59E0B",
+                bg: "#FEF3C7",
+                route: "/daily-challenge",
+              },
+              {
+                icon: "clock" as const,
+                label: "Timer Pomodoro",
+                sub: "Fokus 25 menit",
+                color: "#EF4444",
+                bg: "#FEE2E2",
+                route: "/pomodoro",
+              },
+              {
+                icon: "bookmark" as const,
+                label: "Bookmark Soal",
+                sub: "Review soal tersimpan",
+                color: "#8B5CF6",
+                bg: "#EDE9FE",
+                route: "/bookmarks",
               },
             ].map((q, i) => (
               <TouchableOpacity

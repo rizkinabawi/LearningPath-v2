@@ -19,8 +19,10 @@ import * as Sharing from "expo-sharing";
 import { PromptBuilder } from "@/components/PromptBuilder";
 import {
   getStats, getProgress, getUser, getLearningPaths, getModules, getLessons,
-  type Stats, type Progress, type User, type LearningPath,
+  getSessionLogs,
+  type Stats, type Progress, type User, type LearningPath, type SessionLog,
 } from "@/utils/storage";
+import { useRouter } from "expo-router";
 import { classifyAllItems, type DifficultyStats } from "@/utils/difficulty-classifier";
 import { generateReportHTML } from "@/utils/report-generator";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -54,6 +56,7 @@ const SHARE_GRADS: [string, string][] = [
 ];
 
 export default function ProgressTab() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
@@ -68,6 +71,7 @@ export default function ProgressTab() {
   const [shareLoading, setShareLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [pathStats, setPathStats] = useState<PathStat[]>([]);
+  const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
   const [activeDiff, setActiveDiff] = useState<"mudah" | "sedang" | "susah">("susah");
 
   // Switch tab when navigated with ?tab= param
@@ -80,8 +84,8 @@ export default function ProgressTab() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [s, p, d, u] = await Promise.all([getStats(), getProgress(), classifyAllItems(), getUser()]);
-      setStats(s); setProgress(p); setDifficulty(d); setUser(u);
+      const [s, p, d, u, logs] = await Promise.all([getStats(), getProgress(), classifyAllItems(), getUser(), getSessionLogs()]);
+      setStats(s); setProgress(p); setDifficulty(d); setUser(u); setSessionLogs(logs);
       // Compute per-path stats
       const paths = await getLearningPaths();
       const mods = await getModules();
@@ -369,6 +373,100 @@ export default function ProgressTab() {
                   <Text style={styles.legendText}>{t.progress.wrong}</Text>
                 </View>
                 <Text style={styles.legendText}>{recent.length} aktivitas</Text>
+              </View>
+            </View>
+          )}
+
+          {/* ─── Streak Calendar (30 days) ─── */}
+          {(() => {
+            const today = new Date();
+            const days = Array.from({ length: 35 }, (_, i) => {
+              const d = new Date(today);
+              d.setDate(today.getDate() - (34 - i));
+              const key = d.toISOString().slice(0, 10);
+              const hasActivity = sessionLogs.some((l) => l.date?.slice(0, 10) === key);
+              const isToday = key === today.toISOString().slice(0, 10);
+              return { key, hasActivity, isToday, dayNum: d.getDate(), weekday: d.getDay() };
+            });
+            const cellSize = Math.floor((Math.min(width, 1100) - 28 - 12 * 2 - 6 * 4) / 7);
+            return (
+              <View style={styles.card}>
+                <View style={styles.cardHead}>
+                  <View style={styles.cardHeadLeft}>
+                    <LinearGradient colors={["#10B981","#059669"]} style={styles.cardHeadIcon}>
+                      <Feather name="calendar" size={13} color="#fff" />
+                    </LinearGradient>
+                    <Text style={styles.cardTitle}>Kalender Streak</Text>
+                  </View>
+                  <Text style={styles.cardHint}>{stats?.streak ?? 0} hari berturut</Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
+                  {["M","S","S","R","K","J","S"].map((d, i) => (
+                    <Text key={i} style={{ width: cellSize, textAlign: "center", fontSize: 9, fontWeight: "800", color: Colors.textMuted, marginBottom: 4 }}>{d}</Text>
+                  ))}
+                  {days.map((d) => (
+                    <View key={d.key} style={{
+                      width: cellSize, height: cellSize, borderRadius: 8, marginBottom: 4,
+                      backgroundColor: d.hasActivity ? (d.isToday ? Colors.primary : Colors.teal) : Colors.border,
+                      alignItems: "center", justifyContent: "center",
+                      borderWidth: d.isToday ? 2 : 0, borderColor: Colors.primary,
+                    }}>
+                      <Text style={{ fontSize: 9, fontWeight: "700", color: d.hasActivity ? "#fff" : Colors.textMuted }}>{d.dayNum}</Text>
+                    </View>
+                  ))}
+                </View>
+                <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: Colors.teal }} />
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>Ada aktivitas</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: Colors.border }} />
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>Tidak ada</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })()}
+
+          {/* Session History Link */}
+          <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/session-history")} style={[styles.card, { flexDirection: "row", alignItems: "center", padding: 16, gap: 14 }]}>
+            <LinearGradient colors={[Colors.teal, "#0EA5E9"]} style={{ width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" }}>
+              <Feather name="list" size={18} color="#fff" />
+            </LinearGradient>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.dark }}>Riwayat Sesi Belajar</Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>{sessionLogs.length} sesi tercatat · Tap untuk detail</Text>
+            </View>
+            <Feather name="chevron-right" size={15} color={Colors.border} />
+          </TouchableOpacity>
+
+          {/* ─── Per-Topic Stats ─── */}
+          {pathStats.length > 0 && (
+            <View style={styles.card}>
+              <View style={styles.cardHead}>
+                <View style={styles.cardHeadLeft}>
+                  <LinearGradient colors={["#7C3AED","#A855F7"]} style={styles.cardHeadIcon}>
+                    <Feather name="layers" size={13} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.cardTitle}>Statistik Per Topik</Text>
+                </View>
+              </View>
+              <View style={{ gap: 10 }}>
+                {pathStats.map((ps, i) => {
+                  const pct = ps.total > 0 ? Math.round((ps.correct / ps.total) * 100) : 0;
+                  const barColor = pct >= 70 ? Colors.teal : pct >= 40 ? "#FF9500" : "#FF6B6B";
+                  return (
+                    <View key={ps.path.id}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.dark, flex: 1 }} numberOfLines={1}>{ps.path.name}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: barColor, marginLeft: 8 }}>{pct}%</Text>
+                      </View>
+                      <ProgressBar value={pct} color={barColor} height={7} backgroundColor={Colors.border} />
+                      <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 3 }}>{ps.correct} benar · {ps.wrong} salah · {ps.total} total</Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}

@@ -120,6 +120,36 @@ export interface StudyMaterial {
   createdAt: string;
 }
 
+export interface SessionLog {
+  id: string;
+  type: "flashcard" | "quiz";
+  lessonId: string;
+  lessonName: string;
+  total: number;
+  correct: number;
+  durationSec: number;
+  date: string;
+}
+
+export interface BookmarkedItem {
+  id: string;
+  type: "flashcard" | "quiz";
+  itemId: string;
+  question: string;
+  answer: string;
+  lessonId: string;
+  lessonName: string;
+  createdAt: string;
+}
+
+export interface SpacedRepData {
+  cardId: string;
+  easeFactor: number;
+  interval: number;
+  repetitions: number;
+  nextReview: string;
+}
+
 // Course Pack for export/import
 export interface CoursePack {
   version: number;           // 1 = no assets, 2 = base64 assets embedded
@@ -149,6 +179,10 @@ const STORAGE_KEYS = {
   STATS: "stats",
   NOTES: "notes",
   STUDY_MATERIALS: "study_materials",
+  SESSION_LOGS: "session_logs",
+  BOOKMARKS: "bookmarks",
+  SPACED_REP: "spaced_rep",
+  THEME: "theme",
 };
 
 export const generateId = () =>
@@ -357,6 +391,99 @@ export const updateStats = async (updates: Partial<Stats>) => {
 
 export const clearAllData = async () => {
   await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
+};
+
+// ─── Session Logs ──────────────────────────────────────────────
+export const getSessionLogs = async (): Promise<SessionLog[]> => {
+  return getFromStorage<SessionLog>(STORAGE_KEYS.SESSION_LOGS);
+};
+
+export const saveSessionLog = async (log: SessionLog) => {
+  const logs = await getSessionLogs();
+  logs.unshift(log);
+  const trimmed = logs.slice(0, 200);
+  await saveToStorage(STORAGE_KEYS.SESSION_LOGS, trimmed);
+};
+
+// ─── Bookmarks ─────────────────────────────────────────────────
+export const getBookmarks = async (): Promise<BookmarkedItem[]> => {
+  return getFromStorage<BookmarkedItem>(STORAGE_KEYS.BOOKMARKS);
+};
+
+export const toggleBookmark = async (item: Omit<BookmarkedItem, "id" | "createdAt">): Promise<boolean> => {
+  const bookmarks = await getBookmarks();
+  const exists = bookmarks.find((b) => b.itemId === item.itemId && b.type === item.type);
+  if (exists) {
+    await saveToStorage(STORAGE_KEYS.BOOKMARKS, bookmarks.filter((b) => b.id !== exists.id));
+    return false;
+  } else {
+    bookmarks.unshift({ ...item, id: generateId(), createdAt: new Date().toISOString() });
+    await saveToStorage(STORAGE_KEYS.BOOKMARKS, bookmarks);
+    return true;
+  }
+};
+
+export const isBookmarked = async (itemId: string, type: "flashcard" | "quiz"): Promise<boolean> => {
+  const bookmarks = await getBookmarks();
+  return bookmarks.some((b) => b.itemId === itemId && b.type === type);
+};
+
+// ─── Spaced Repetition (SM-2) ──────────────────────────────────
+export const getSpacedRepData = async (): Promise<SpacedRepData[]> => {
+  return getFromStorage<SpacedRepData>(STORAGE_KEYS.SPACED_REP);
+};
+
+export const getCardSpacedRep = async (cardId: string): Promise<SpacedRepData> => {
+  const all = await getSpacedRepData();
+  return all.find((d) => d.cardId === cardId) ?? {
+    cardId,
+    easeFactor: 2.5,
+    interval: 1,
+    repetitions: 0,
+    nextReview: new Date().toISOString(),
+  };
+};
+
+export const updateSpacedRep = async (cardId: string, quality: number) => {
+  const all = await getSpacedRepData();
+  const existing = all.find((d) => d.cardId === cardId) ?? {
+    cardId,
+    easeFactor: 2.5,
+    interval: 1,
+    repetitions: 0,
+    nextReview: new Date().toISOString(),
+  };
+  let { easeFactor, interval, repetitions } = existing;
+  if (quality >= 3) {
+    if (repetitions === 0) interval = 1;
+    else if (repetitions === 1) interval = 6;
+    else interval = Math.round(interval * easeFactor);
+    repetitions += 1;
+    easeFactor = Math.max(1.3, easeFactor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+  } else {
+    repetitions = 0;
+    interval = 1;
+  }
+  const nextReview = new Date(Date.now() + interval * 86400000).toISOString();
+  const updated: SpacedRepData = { cardId, easeFactor, interval, repetitions, nextReview };
+  const rest = all.filter((d) => d.cardId !== cardId);
+  await saveToStorage(STORAGE_KEYS.SPACED_REP, [...rest, updated]);
+  return updated;
+};
+
+export const sortBySpacedRep = async (cards: Flashcard[]): Promise<Flashcard[]> => {
+  const now = Date.now();
+  const all = await getSpacedRepData();
+  const dataMap = new Map(all.map((d) => [d.cardId, d]));
+  return [...cards].sort((a, b) => {
+    const da = dataMap.get(a.id);
+    const db = dataMap.get(b.id);
+    const dueA = da ? new Date(da.nextReview).getTime() : 0;
+    const dueB = db ? new Date(db.nextReview).getTime() : 0;
+    const overdueA = dueA <= now ? 0 : dueA;
+    const overdueB = dueB <= now ? 0 : dueB;
+    return overdueA - overdueB;
+  });
 };
 
 // ─── Notes ─────────────────────────────────────────────────────

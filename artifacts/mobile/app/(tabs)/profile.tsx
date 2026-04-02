@@ -23,6 +23,7 @@ import { extractAssetsFromPack } from "@/utils/bundle-assets";
 import Colors, { shadow, shadowSm } from "@/constants/colors";
 import { isCancellationError } from "@/utils/safe-share";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function ProfileTab() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function ProfileTab() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 720;
   const { t, language, setLanguage } = useTranslation();
+  const { isDark, toggleDark } = useTheme();
   const [user, setUser] = useState<UserType | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [pathCount, setPathCount] = useState(0);
@@ -144,6 +146,30 @@ export default function ProfileTab() {
           if (!isCancellationError(e)) console.warn("[profile] share error", e);
         }
       },
+    },
+    {
+      icon: "star" as const, label: "Tantangan Harian",
+      sub: "Coba soal challenge hari ini",
+      color: "#F59E0B",
+      onPress: () => router.push("/daily-challenge"),
+    },
+    {
+      icon: "clock" as const, label: "Timer Pomodoro",
+      sub: "Sesi belajar terstruktur 25/5 menit",
+      color: "#EF4444",
+      onPress: () => router.push("/pomodoro"),
+    },
+    {
+      icon: "bookmark" as const, label: "Soal Tersimpan",
+      sub: "Review flashcard & quiz yang di-bookmark",
+      color: "#8B5CF6",
+      onPress: () => router.push("/bookmarks"),
+    },
+    {
+      icon: "list" as const, label: "Riwayat Sesi",
+      sub: "Lihat semua sesi belajar yang lalu",
+      color: Colors.teal,
+      onPress: () => router.push("/session-history"),
     },
     {
       icon: "code" as const, label: t.profile.about_dev,
@@ -316,6 +342,21 @@ export default function ProfileTab() {
                 </TouchableOpacity>
               );
             })}
+          </View>
+        </View>
+
+        {/* Dark Mode */}
+        <Text style={styles.menuLabel}>Tampilan</Text>
+        <View style={[styles.menuCard, shadowSm, { marginBottom: 4 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", padding: 16, gap: 14 }}>
+            <View style={[styles.menuIconWrap, { backgroundColor: isDark ? "#374151" : "#F3F4F6" }]}>
+              <Feather name={isDark ? "moon" : "sun"} size={18} color={isDark ? "#93C5FD" : "#F59E0B"} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.menuTitle]}>Dark Mode</Text>
+              <Text style={styles.menuSub}>{isDark ? "Mode gelap aktif" : "Mode terang aktif"}</Text>
+            </View>
+            <Switch value={isDark} onValueChange={toggleDark} trackColor={{ true: Colors.primary, false: Colors.border }} thumbColor={isDark ? "#fff" : "#fff"} />
           </View>
         </View>
 

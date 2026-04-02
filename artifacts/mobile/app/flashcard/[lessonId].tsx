@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -19,9 +19,15 @@ import {
   getStats,
   getLessons,
   generateId,
+  saveSessionLog,
+  toggleBookmark,
+  isBookmarked,
+  updateSpacedRep,
+  sortBySpacedRep,
   type Flashcard,
   type Lesson,
 } from "@/utils/storage";
+import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { ProgressBar } from "@/components/ProgressBar";
 import { AchievementPopup } from "@/components/AchievementPopup";
@@ -41,20 +47,46 @@ export default function FlashcardScreen() {
   const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
   const [showAchievement, setShowAchievement] = useState(false);
   const [achievementValue, setAchievementValue] = useState(0);
+  const [lessonName, setLessonName] = useState("");
+  const [bookmarked, setBookmarked] = useState(false);
+  const startTime = useRef(Date.now());
+  const xpAnim = useRef(new Animated.Value(0)).current;
 
   const [flipAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     (async () => {
-      const data = await getFlashcards(lessonId);
-      setCards(data);
+      const rawData = await getFlashcards(lessonId);
+      const sorted = await sortBySpacedRep(rawData);
+      setCards(sorted);
       const lessons = await getLessons();
+      const lesson = lessons.find((l) => l.id === lessonId);
+      if (lesson) setLessonName(lesson.name);
       const idx = lessons.findIndex((l) => l.id === lessonId);
       if (idx !== -1 && idx + 1 < lessons.length) {
         setNextLesson(lessons[idx + 1]);
       }
     })();
   }, [lessonId]);
+
+  useEffect(() => {
+    if (cards[currentIndex]) {
+      isBookmarked(cards[currentIndex].id, "flashcard").then(setBookmarked);
+    }
+  }, [currentIndex, cards]);
+
+  const handleBookmark = async () => {
+    const card = cards[currentIndex];
+    if (!card) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const added = await toggleBookmark({ type: "flashcard", itemId: card.id, question: card.question, answer: card.answer, lessonId: lessonId ?? "", lessonName });
+    setBookmarked(added);
+  };
+
+  const triggerXP = () => {
+    xpAnim.setValue(0);
+    Animated.timing(xpAnim, { toValue: 1, duration: 1200, useNativeDriver: true }).start();
+  };
 
   const handleFlip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -73,7 +105,8 @@ export default function FlashcardScreen() {
     Haptics.impactAsync(
       correct ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium
     );
-    setCompleted((prev) => ({ ...prev, [card.id]: correct ? "correct" : "wrong" }));
+    const newCompleted = { ...completed, [card.id]: correct ? "correct" : "wrong" } as Record<string, "correct" | "wrong">;
+    setCompleted(newCompleted);
 
     await saveProgress({
       id: generateId(),
@@ -90,15 +123,28 @@ export default function FlashcardScreen() {
       correctAnswers: stats.correctAnswers + (correct ? 1 : 0),
     });
 
+    await updateSpacedRep(card.id, correct ? 5 : 1);
+
     if (currentIndex < cards.length - 1) {
       setFlipped(false);
       flipAnim.setValue(0);
       setCurrentIndex((i) => i + 1);
     } else {
-      const correctCount = Object.values({ ...completed, [cards[currentIndex].id]: correct ? "correct" : "wrong" }).filter((v) => v === "correct").length;
+      const correctCount = Object.values(newCompleted).filter((v) => v === "correct").length;
       setAchievementValue(correctCount);
+      const durationSec = Math.round((Date.now() - startTime.current) / 1000);
+      await saveSessionLog({
+        id: `${Date.now()}`,
+        type: "flashcard",
+        lessonId: lessonId ?? "",
+        lessonName,
+        total: cards.length,
+        correct: correctCount,
+        durationSec,
+        date: new Date().toISOString(),
+      });
       setDone(true);
-      setTimeout(() => setShowAchievement(true), 400);
+      setTimeout(() => { setShowAchievement(true); triggerXP(); }, 400);
     }
   };
 
@@ -132,6 +178,10 @@ export default function FlashcardScreen() {
   if (done) {
     const correctCount = Object.values(completed).filter((v) => v === "correct").length;
     const pct = Math.round((correctCount / cards.length) * 100);
+    const xpEarned = correctCount * 10;
+    const xpTranslateY = xpAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -60, -80] });
+    const xpOpacity = xpAnim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, 1, 0] });
+    const xpScale = xpAnim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.5, 1.2, 1] });
     return (
       <View
         style={[
@@ -139,6 +189,9 @@ export default function FlashcardScreen() {
           { paddingTop: Platform.OS === "web" ? 80 : insets.top + 24 },
         ]}
       >
+        <Animated.View style={[styles.xpBadge, { opacity: xpOpacity, transform: [{ translateY: xpTranslateY }, { scale: xpScale }] }]}>
+          <Text style={styles.xpText}>+{xpEarned} XP ⚡</Text>
+        </Animated.View>
         <Text style={styles.resultEmoji}>{pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪"}</Text>
         <Text style={styles.resultTitle}>{t.flashcard.result_title}</Text>
         <Text style={styles.resultScore}>{pct}%</Text>
@@ -206,12 +259,17 @@ export default function FlashcardScreen() {
           <X size={20} color={Colors.black} />
         </TouchableOpacity>
         <Text style={styles.navCount}>{currentIndex + 1} / {cards.length}</Text>
-        <TouchableOpacity
-          onPress={() => router.push(`/create-flashcard/${lessonId}`)}
-          style={styles.navBtn}
-        >
-          <Plus size={20} color={Colors.black} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <TouchableOpacity onPress={handleBookmark} style={styles.navBtn}>
+            <Feather name="bookmark" size={18} color={bookmarked ? "#F59E0B" : Colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push(`/create-flashcard/${lessonId}`)}
+            style={styles.navBtn}
+          >
+            <Plus size={20} color={Colors.black} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Progress */}
@@ -477,4 +535,20 @@ const styles = StyleSheet.create({
   },
   nextLessonBtnText: { color: Colors.primary, fontWeight: "800", fontSize: 14, flex: 1 },
   nextLessonArrow: { color: Colors.primary, fontWeight: "900", fontSize: 18 },
+  xpBadge: {
+    position: "absolute",
+    top: Platform.OS === "web" ? 80 : 90,
+    alignSelf: "center",
+    backgroundColor: "#4C6FFF",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+    zIndex: 100,
+    shadowColor: "#4C6FFF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  xpText: { fontSize: 18, fontWeight: "900", color: "#fff" },
 });

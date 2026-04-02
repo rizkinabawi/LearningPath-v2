@@ -18,6 +18,7 @@ import { ToastContainer } from "@/components/Toast";
 import { scheduleDailyMotivation, getReminderSettings, scheduleStudyReminder } from "@/utils/notifications";
 import { isCancellationError } from "@/utils/safe-share";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 // Suppress share-cancellation noise in dev overlay
 LogBox.ignoreLogs([
@@ -258,6 +259,22 @@ function RootLayoutNav() {
         name="about-developer"
         options={{ headerShown: false, animation: "slide_from_right" }}
       />
+      <Stack.Screen
+        name="pomodoro"
+        options={{ headerShown: false, animation: "slide_from_right" }}
+      />
+      <Stack.Screen
+        name="session-history"
+        options={{ headerShown: false, animation: "slide_from_right" }}
+      />
+      <Stack.Screen
+        name="bookmarks"
+        options={{ headerShown: false, animation: "slide_from_right" }}
+      />
+      <Stack.Screen
+        name="daily-challenge"
+        options={{ headerShown: false, animation: "slide_from_right" }}
+      />
     </Stack>
   );
 }
@@ -285,6 +302,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
+        <ThemeProvider>
         <LanguageProvider>
           <QueryClientProvider client={queryClient}>
             <GestureHandlerRootView style={{ flex: 1 }}>
@@ -293,6 +311,7 @@ export default function RootLayout() {
             </GestureHandlerRootView>
           </QueryClientProvider>
         </LanguageProvider>
+        </ThemeProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   Platform,
   ScrollView,
   Image,
+  Animated,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X, ChevronRight, Check, Plus, RotateCcw } from "lucide-react-native";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import {
   getQuizzes,
@@ -19,6 +21,9 @@ import {
   getStats,
   getLessons,
   generateId,
+  saveSessionLog,
+  toggleBookmark,
+  isBookmarked,
   type Quiz,
   type Lesson,
 } from "@/utils/storage";
@@ -42,18 +47,43 @@ export default function QuizScreen() {
   const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
   const [showAchievement, setShowAchievement] = useState(false);
   const [achievementValue, setAchievementValue] = useState(0);
+  const [lessonName, setLessonName] = useState("");
+  const [bookmarked, setBookmarked] = useState(false);
+  const startTime = useRef(Date.now());
+  const xpAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     (async () => {
       const data = await getQuizzes(lessonId);
       setQuizzes(data);
       const lessons = await getLessons();
+      const lesson = lessons.find((l) => l.id === lessonId);
+      if (lesson) setLessonName(lesson.name);
       const idx = lessons.findIndex((l) => l.id === lessonId);
       if (idx !== -1 && idx + 1 < lessons.length) {
         setNextLesson(lessons[idx + 1]);
       }
     })();
   }, [lessonId]);
+
+  useEffect(() => {
+    if (currentIndex < quizzes.length && quizzes[currentIndex]) {
+      isBookmarked(quizzes[currentIndex].id, "quiz").then(setBookmarked);
+    }
+  }, [currentIndex, quizzes]);
+
+  const handleBookmark = async () => {
+    if (!quizzes[currentIndex]) return;
+    const q = quizzes[currentIndex];
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const added = await toggleBookmark({ type: "quiz", itemId: q.id, question: q.question, answer: q.answer, lessonId: lessonId ?? "", lessonName });
+    setBookmarked(added);
+  };
+
+  const triggerXP = () => {
+    xpAnim.setValue(0);
+    Animated.timing(xpAnim, { toValue: 1, duration: 1200, useNativeDriver: true }).start();
+  };
 
   const currentQuiz = quizzes[currentIndex];
   const progress = (currentIndex / Math.max(quizzes.length, 1)) * 100;
@@ -87,17 +117,27 @@ export default function QuizScreen() {
     });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentIndex < quizzes.length - 1) {
       setCurrentIndex((i) => i + 1);
       setSelectedOption(null);
       setIsAnswered(false);
     } else {
-      const finalScore = score + (isAnswered && quizzes[currentIndex]?.options[selectedOption ?? -1] === quizzes[currentIndex]?.answer ? 0 : 0);
       const pct = Math.round((score / quizzes.length) * 100);
       setAchievementValue(pct);
+      const durationSec = Math.round((Date.now() - startTime.current) / 1000);
+      await saveSessionLog({
+        id: `${Date.now()}`,
+        type: "quiz",
+        lessonId: lessonId ?? "",
+        lessonName,
+        total: quizzes.length,
+        correct: score,
+        durationSec,
+        date: new Date().toISOString(),
+      });
       setDone(true);
-      setTimeout(() => setShowAchievement(true), 400);
+      setTimeout(() => { setShowAchievement(true); triggerXP(); }, 400);
     }
   };
 
@@ -130,6 +170,10 @@ export default function QuizScreen() {
 
   if (done) {
     const pct = Math.round((score / quizzes.length) * 100);
+    const xpEarned = score * 10;
+    const xpTranslateY = xpAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -60, -80] });
+    const xpOpacity = xpAnim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, 1, 0] });
+    const xpScale = xpAnim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.5, 1.2, 1] });
     return (
       <View
         style={[
@@ -137,6 +181,9 @@ export default function QuizScreen() {
           { paddingTop: Platform.OS === "web" ? 80 : insets.top + 24 },
         ]}
       >
+        <Animated.View style={[styles.xpBadge, { opacity: xpOpacity, transform: [{ translateY: xpTranslateY }, { scale: xpScale }] }]}>
+          <Text style={styles.xpText}>+{xpEarned} XP ⚡</Text>
+        </Animated.View>
         <Text style={styles.resultEmoji}>{pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪"}</Text>
         <Text style={styles.resultTitle}>{t.quiz.result_title}</Text>
         <Text style={styles.resultScore}>{pct}%</Text>
@@ -192,12 +239,17 @@ export default function QuizScreen() {
           <X size={20} color={Colors.black} />
         </TouchableOpacity>
         <Text style={styles.navCount}>{currentIndex + 1} / {quizzes.length}</Text>
-        <TouchableOpacity
-          onPress={() => router.push(`/create-quiz/${lessonId}`)}
-          style={styles.navBtn}
-        >
-          <Plus size={20} color={Colors.black} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <TouchableOpacity onPress={handleBookmark} style={styles.navBtn}>
+            <Feather name="bookmark" size={18} color={bookmarked ? "#F59E0B" : Colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push(`/create-quiz/${lessonId}`)}
+            style={styles.navBtn}
+          >
+            <Plus size={20} color={Colors.black} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Progress */}
@@ -459,4 +511,20 @@ const styles = StyleSheet.create({
   },
   nextLessonBtnText: { color: Colors.primary, fontWeight: "800", fontSize: 14, flex: 1 },
   nextLessonArrow: { color: Colors.primary, fontWeight: "900", fontSize: 18 },
+  xpBadge: {
+    position: "absolute",
+    top: Platform.OS === "web" ? 80 : 90,
+    alignSelf: "center",
+    backgroundColor: "#4C6FFF",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+    zIndex: 100,
+    shadowColor: "#4C6FFF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  xpText: { fontSize: 18, fontWeight: "900", color: "#fff" },
 });
