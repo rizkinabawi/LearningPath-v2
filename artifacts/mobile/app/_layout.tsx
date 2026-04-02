@@ -22,7 +22,7 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 // ─── Animated loading dots ───────────────────────────────────────────────────
-function LoadingDot({ delay }: { delay: number }) {
+function LoadingDot({ delay, color }: { delay: number; color: string }) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -33,13 +33,13 @@ function LoadingDot({ delay }: { delay: number }) {
           toValue: 1,
           duration: 350,
           easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(anim, {
           toValue: 0,
           duration: 350,
           easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.delay(Math.max(0, 700 - delay)),
       ])
@@ -53,7 +53,7 @@ function LoadingDot({ delay }: { delay: number }) {
     <Animated.View
       style={[
         splashStyles.dot,
-        { transform: [{ translateY }], opacity },
+        { backgroundColor: color, transform: [{ translateY }], opacity },
       ]}
     />
   );
@@ -104,12 +104,12 @@ function PulseLogo() {
         toValue: 1,
         friction: 6,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(opacity, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start();
   }, []);
@@ -123,28 +123,17 @@ function PulseLogo() {
 
 // ─── Full splash / loading screen ────────────────────────────────────────────
 function AppLoadingScreen() {
-  const textOpacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(textOpacity, {
-      toValue: 1,
-      duration: 500,
-      delay: 200,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
   return (
     <View style={splashStyles.container}>
       <PulseLogo />
-      <Animated.View style={{ opacity: textOpacity, alignItems: "center" }}>
+      <View style={{ alignItems: "center" }}>
         <Text style={splashStyles.appName}>LearningPath</Text>
         <Text style={splashStyles.tagline}>Belajar lebih cerdas setiap hari</Text>
-      </Animated.View>
+      </View>
       <View style={splashStyles.dotsRow}>
-        <LoadingDot delay={0} />
-        <LoadingDot delay={180} />
-        <LoadingDot delay={360} />
+        <LoadingDot delay={0} color="#4C6FFF" />
+        <LoadingDot delay={180} color="#38BDF8" />
+        <LoadingDot delay={360} color="#7C3AED" />
       </View>
       <ProgressBar />
     </View>
